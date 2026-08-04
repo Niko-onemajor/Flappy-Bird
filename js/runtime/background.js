@@ -52,25 +52,28 @@ export default class BackGround {
     this._drawBase(ctx);
   }
 
-  /* 绘制天空背景（水平视差滚动） */
+  /* 绘制天空背景（水平视差滚动，动态平铺适配任意屏幕宽度） */
   _drawBg(ctx) {
     const w = this.bgDrawW;
     const h = this.bgDrawH;
 
-    /* 绘制两段背景实现无缝视差滚动 */
-    ctx.drawImage(this.bgImg, -this.bgOffsetX, 0, w, h);
-    ctx.drawImage(this.bgImg, w - this.bgOffsetX, 0, w, h);
-    /* 补充第三段防止极端情况缺口 */
-    ctx.drawImage(this.bgImg, w * 2 - this.bgOffsetX, 0, w, h);
+    /* 动态计算所需平铺块数：屏幕宽度 / 单块宽度，+2 覆盖滚动偏移 */
+    const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+    for (let i = 0; i < tilesNeeded; i++) {
+      ctx.drawImage(this.bgImg, i * w - this.bgOffsetX, 0, w, h);
+    }
   }
 
   /* 绘制滚动地面 */
   _drawBase(ctx) {
     const baseY = SCREEN_HEIGHT - GROUND.HEIGHT;
+    const w = GROUND.IMG_WIDTH;
+    const h = GROUND.HEIGHT;
 
-    /* 绘制三段地面实现无缝滚动 */
-    ctx.drawImage(this.baseImg, -this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
-    ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
-    ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH * 2 - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
+    /* 动态计算所需平铺块数 */
+    const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+    for (let i = 0; i < tilesNeeded; i++) {
+      ctx.drawImage(this.baseImg, i * w - this.baseX, baseY, w, h);
+    }
   }
 }
