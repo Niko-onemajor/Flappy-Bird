@@ -2,19 +2,15 @@ import Sprite from '../base/sprite';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 
 const PIPE_WIDTH = 52;
-const PIPE_IMAGES = ['images/pipe-green.png', 'images/pipe-red.png'];
 const GROUND_OFFSET = 112;      /* 地面高度 */
-const PIPE_MIN_LENGTH = 60;     /* 单管最短长度 */
-const BIRD_CLEARANCE = 50;      /* 小鸟通过所需最小空间 */
+const PIPE_MIN_LENGTH = 40;     /* 单管最短长度（缩小以适应横屏） */
+const BIRD_CLEARANCE = 55;      /* 小鸟通过所需最小空间（含鸟高度+余量） */
 const MOVE_RANGE = 40;          /* 移动管振荡范围 */
 const HITBOX_SHRINK = 6;        /* 碰撞框内缩（像素） */
 
-/* 预加载水管图片，避免首次渲染时图片未加载完成 */
-const pipeImageCache = PIPE_IMAGES.map((src) => {
-  const img = wx.createImage();
-  img.src = src;
-  return img;
-});
+/* 预加载水管图片：绿色固定管、红色移动管 */
+const PIPE_GREEN_IMG = (() => { const img = wx.createImage(); img.src = 'images/pipe-green.png'; return img; })();
+const PIPE_RED_IMG = (() => { const img = wx.createImage(); img.src = 'images/pipe-red.png'; return img; })();
 
 /* 障碍物类型 */
 const PIPE_TYPE = {
@@ -26,7 +22,7 @@ const PIPE_TYPE = {
 
 export default class Pipe extends Sprite {
   scored = false;
-  gap = 140;
+  gap = 130;
   speed = 3;
   pipeType = PIPE_TYPE.NORMAL;
   baseGapY = 0;
@@ -34,11 +30,10 @@ export default class Pipe extends Sprite {
 
   constructor() {
     super('', PIPE_WIDTH, 0);
-    /* 从预加载缓存中随机选择水管图片 */
-    this.pipeImg = pipeImageCache[Math.floor(Math.random() * pipeImageCache.length)];
+    this.pipeImg = PIPE_GREEN_IMG;
   }
 
-  init(gap = 140, speed = 3) {
+  init(gap = 130, speed = 3) {
     this.visible = true;
     this.isActive = true;
     this.scored = false;
@@ -48,15 +43,18 @@ export default class Pipe extends Sprite {
     this.movePhase = Math.random() * Math.PI * 2;
 
     const rand = Math.random();
-    if (rand < 0.35) {
+    if (rand < 0.40) {
       this.pipeType = PIPE_TYPE.NORMAL;
-    } else if (rand < 0.55) {
+    } else if (rand < 0.60) {
       this.pipeType = PIPE_TYPE.TOP_ONLY;
-    } else if (rand < 0.75) {
+    } else if (rand < 0.80) {
       this.pipeType = PIPE_TYPE.BOTTOM_ONLY;
     } else {
       this.pipeType = PIPE_TYPE.MOVING;
     }
+
+    /* 移动管用红色，固定管用绿色，便于玩家区分 */
+    this.pipeImg = this.pipeType === PIPE_TYPE.MOVING ? PIPE_RED_IMG : PIPE_GREEN_IMG;
 
     this._calcGapPosition();
   }
@@ -66,33 +64,44 @@ export default class Pipe extends Sprite {
 
     switch (this.pipeType) {
       case PIPE_TYPE.TOP_ONLY: {
+        /* 只有上管：下方留出足够通过空间 */
         const maxTop = availableH - BIRD_CLEARANCE;
-        this.gapY = PIPE_MIN_LENGTH + Math.random() * (maxTop - PIPE_MIN_LENGTH);
+        this.gapY = PIPE_MIN_LENGTH + Math.random() * Math.max(0, maxTop - PIPE_MIN_LENGTH);
         break;
       }
       case PIPE_TYPE.BOTTOM_ONLY: {
+        /* 只有下管：上方留出足够通过空间 */
         const minBottom = BIRD_CLEARANCE;
-        this.gapY = minBottom + Math.random() * (availableH - PIPE_MIN_LENGTH - minBottom);
+        const maxBottom = availableH - PIPE_MIN_LENGTH;
+        this.gapY = minBottom + Math.random() * Math.max(0, maxBottom - minBottom);
         break;
       }
       case PIPE_TYPE.MOVING: {
-        const minY = PIPE_MIN_LENGTH;
-        const maxY = availableH - this.gap - PIPE_MIN_LENGTH;
-        if (maxY <= minY) {
-          this.gapY = availableH / 2 - this.gap / 2;
+        /* 移动双管 */
+        const minGapY = PIPE_MIN_LENGTH;
+        const maxGapY = availableH - this.gap - PIPE_MIN_LENGTH;
+        if (maxGapY <= minGapY) {
+          /* 可用空间不足时，缩小gap确保通过 */
+          const actualGap = Math.max(BIRD_CLEARANCE, availableH - PIPE_MIN_LENGTH * 2);
+          this.gap = actualGap;
+          this.gapY = PIPE_MIN_LENGTH;
         } else {
-          this.gapY = minY + Math.random() * (maxY - minY);
+          this.gapY = minGapY + Math.random() * (maxGapY - minGapY);
         }
         this.baseGapY = this.gapY;
         break;
       }
       default: {
-        const minY = PIPE_MIN_LENGTH;
-        const maxY = availableH - this.gap - PIPE_MIN_LENGTH;
-        if (maxY <= minY) {
-          this.gapY = availableH / 2 - this.gap / 2;
+        /* 普通双管 */
+        const minGapY = PIPE_MIN_LENGTH;
+        const maxGapY = availableH - this.gap - PIPE_MIN_LENGTH;
+        if (maxGapY <= minGapY) {
+          /* 可用空间不足时，缩小gap确保通过 */
+          const actualGap = Math.max(BIRD_CLEARANCE, availableH - PIPE_MIN_LENGTH * 2);
+          this.gap = actualGap;
+          this.gapY = PIPE_MIN_LENGTH;
         } else {
-          this.gapY = minY + Math.random() * (maxY - minY);
+          this.gapY = minGapY + Math.random() * (maxGapY - minGapY);
         }
         break;
       }
@@ -109,6 +118,7 @@ export default class Pipe extends Sprite {
       const offset = Math.sin(this.movePhase) * MOVE_RANGE;
       this.gapY = this.baseGapY + offset;
       const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
+      /* 移动范围限制，确保始终有通过空间 */
       this.gapY = Math.max(PIPE_MIN_LENGTH, Math.min(this.gapY, availableH - this.gap - PIPE_MIN_LENGTH));
     }
 

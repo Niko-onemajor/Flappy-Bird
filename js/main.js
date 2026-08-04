@@ -21,10 +21,14 @@ const SCREEN_STATE = {
 GameGlobal.screenState = SCREEN_STATE.HOME;
 
 /* 固定游戏参数 */
-const PIPE_INTERVAL = 100;
-const PIPE_SPEED = 3;
-const PIPE_GAP = 140;
-const PROP_SPAWN_RATE = 0.006;
+const PIPE_INTERVAL_BASE = 100;   /* 基础水管间隔（帧） */
+const PIPE_INTERVAL_MIN = 55;     /* 最小水管间隔 */
+const PIPE_SPEED_BASE = 3;        /* 基础水管速度 */
+const PIPE_SPEED_MAX = 6.5;       /* 最大水管速度 */
+const PIPE_GAP_BASE = 130;        /* 基础水管间隙 */
+const PIPE_GAP_MIN = 80;          /* 最小水管间隙 */
+const PROP_SPAWN_RATE = 0.005;    /* 道具生成概率 */
+const DIFFICULTY_STEP = 5;        /* 每N分提升一次难度 */
 
 /**
  * 横版点击跳跃小游戏主循环
@@ -41,6 +45,18 @@ export default class Main {
     this.gameInfo.on('restart', this.restartGame.bind(this));
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
     this.loop();
+  }
+
+  /* 根据当前分数计算难度参数 */
+  getDifficulty() {
+    const db = GameGlobal.databus;
+    const level = Math.floor(db.score / DIFFICULTY_STEP);
+
+    return {
+      speed: Math.min(PIPE_SPEED_BASE + level * 0.35, PIPE_SPEED_MAX),
+      gap: Math.max(PIPE_GAP_BASE - level * 5, PIPE_GAP_MIN),
+      interval: Math.max(PIPE_INTERVAL_BASE - level * 4, PIPE_INTERVAL_MIN),
+    };
   }
 
   /* 返回主页 */
@@ -71,9 +87,10 @@ export default class Main {
 
   /* 生成水管 */
   pipeGenerate() {
-    if (GameGlobal.databus.frame % PIPE_INTERVAL === 0) {
+    const diff = this.getDifficulty();
+    if (GameGlobal.databus.frame % diff.interval === 0) {
       const pipe = GameGlobal.databus.pool.getItemByClass('pipe', Pipe);
-      pipe.init(PIPE_GAP, PIPE_SPEED);
+      pipe.init(diff.gap, diff.speed);
       GameGlobal.databus.pipes.push(pipe);
     }
   }
@@ -82,7 +99,7 @@ export default class Main {
   propGenerate() {
     if (Math.random() < PROP_SPAWN_RATE) {
       const prop = GameGlobal.databus.pool.getItemByClass('prop', Prop);
-      prop.init();
+      prop.init(null, GameGlobal.databus.pipes);
       GameGlobal.databus.props.push(prop);
     }
   }

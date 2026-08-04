@@ -33,14 +33,65 @@ export default class Prop extends Sprite {
     super('', PROP_SIZE, PROP_SIZE);
   }
 
-  init(type) {
+  init(type, pipes) {
     this.type = type || PROP_TYPES[Math.floor(Math.random() * PROP_TYPES.length)];
     this.visible = true;
     this.isActive = true;
     this.collected = false;
     this.animPhase = Math.random() * Math.PI * 2;
-    this.x = SCREEN_WIDTH + Math.random() * 80;
-    this.y = 60 + Math.random() * (SCREEN_HEIGHT - 170);
+    this.x = SCREEN_WIDTH + Math.random() * 60;
+
+    /* 智能选择Y位置：优先放在水管间隙中，避免与水管重叠 */
+    this.y = this._findSafeY(pipes || []);
+  }
+
+  /* 在水管间隙中找一个安全Y位置 */
+  _findSafeY(pipes) {
+    const safeTop = 40;
+    const safeBottom = SCREEN_HEIGHT - 120;  /* 避开地面 */
+
+    /* 找到所有即将进入屏幕的水管 */
+    const nearbyPipes = pipes.filter((p) => p.visible && p.x < SCREEN_WIDTH + 120 && p.x > this.x - 60);
+
+    if (nearbyPipes.length === 0) {
+      /* 没有附近水管，在安全区域内随机 */
+      return safeTop + Math.random() * (safeBottom - safeTop);
+    }
+
+    /* 收集所有水管的间隙区域 */
+    const gapZones = [];
+    for (const pipe of nearbyPipes) {
+      const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
+      const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
+
+      if (hasTop && hasBottom) {
+        /* 双管：间隙在 gapY ~ gapY + gap 之间 */
+        const gapStart = pipe.gapY;
+        const gapEnd = pipe.gapY + pipe.gap;
+        /* 间隙内缩一点确保道具不会贴边 */
+        const margin = this.height + 8;
+        if (gapEnd - gapStart > margin * 2) {
+          gapZones.push({ start: gapStart + margin, end: gapEnd - margin });
+        }
+      } else if (hasTop) {
+        /* 只有上管：下方是安全的 */
+        gapZones.push({ start: pipe.gapY + this.height + 8, end: safeBottom });
+      } else if (hasBottom) {
+        /* 只有下管：上方是安全的 */
+        gapZones.push({ start: safeTop, end: pipe.gapY - this.height - 8 });
+      }
+    }
+
+    if (gapZones.length > 0) {
+      /* 随机选择一个间隙区域 */
+      const zone = gapZones[Math.floor(Math.random() * gapZones.length)];
+      if (zone.end > zone.start) {
+        return zone.start + Math.random() * (zone.end - zone.start);
+      }
+    }
+
+    /* 兜底：在安全区域内随机 */
+    return safeTop + Math.random() * (safeBottom - safeTop);
   }
 
   update() {
