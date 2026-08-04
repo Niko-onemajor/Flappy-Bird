@@ -109,7 +109,7 @@ export default class Main {
     this.pipeTimer = diff.interval;
   }
 
-  /* 生成道具：计时器 + 随机间隔 */
+  /* 生成道具：匹配最近水管间隙中心，与水管同速移动 */
   propGenerate() {
     const diff = this.getDifficulty();
 
@@ -117,7 +117,7 @@ export default class Main {
     if (this.propTimer > 0) return;
 
     const prop = GameGlobal.databus.pool.getItemByClass('prop', Prop);
-    prop.init(null, GameGlobal.databus.pipes);
+    prop.init(null, GameGlobal.databus.pipes, diff.speed);
     GameGlobal.databus.props.push(prop);
 
     this.propTimer = diff.propInterval + Math.floor(Math.random() * PROP_CFG.INTERVAL_RANDOM);
