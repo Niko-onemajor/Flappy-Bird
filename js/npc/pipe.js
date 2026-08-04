@@ -1,42 +1,111 @@
 import Sprite from '../base/sprite';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 
-const PIPE_WIDTH = 60;
-const PIPE_GAP = 150;       // 上下水管之间的间隙
-const PIPE_SPEED = 4;       // 水管向左移动速度
-const GROUND_Y_OFFSET = 50; // 地面偏移
+const PIPE_WIDTH = 52;
+const PIPE_IMAGES = ['images/pipe-green.png', 'images/pipe-red.png'];
+const GROUND_OFFSET = 112;      /* 地面高度 */
+const PIPE_MIN_LENGTH = 60;     /* 单管最短长度 */
+const BIRD_CLEARANCE = 50;      /* 小鸟通过所需最小空间 */
+const MOVE_RANGE = 40;          /* 移动管振荡范围 */
+const HITBOX_SHRINK = 6;        /* 碰撞框内缩（像素） */
+
+/* 障碍物类型 */
+const PIPE_TYPE = {
+  NORMAL: 0,     /* 上下双管 */
+  TOP_ONLY: 1,   /* 只有上管 */
+  BOTTOM_ONLY: 2,/* 只有下管 */
+  MOVING: 3,     /* 上下双管 + 上下移动 */
+};
 
 export default class Pipe extends Sprite {
-  scored = false; // 是否已经计过分
+  scored = false;
+  gap = 140;
+  speed = 3;
+  pipeType = PIPE_TYPE.NORMAL;
+  baseGapY = 0;
+  movePhase = 0;
 
   constructor() {
     super('', PIPE_WIDTH, 0);
-    this.topImg = wx.createImage();
-    this.bottomImg = wx.createImage();
-    this.topImg.src = 'images/enemy.png';
-    this.bottomImg.src = 'images/enemy.png';
+    this.pipeImg = wx.createImage();
+    this.pipeImg.src = PIPE_IMAGES[Math.floor(Math.random() * PIPE_IMAGES.length)];
   }
 
-  init() {
+  init(gap = 140, speed = 3) {
     this.visible = true;
     this.isActive = true;
     this.scored = false;
-
-    // 水管从屏幕右侧出现
+    this.gap = gap;
+    this.speed = speed;
     this.x = SCREEN_WIDTH;
+    this.movePhase = Math.random() * Math.PI * 2;
 
-    // 随机生成间隙的垂直位置
-    const minY = 80;
-    const maxY = SCREEN_HEIGHT - GROUND_Y_OFFSET - PIPE_GAP - 80;
-    this.gapY = minY + Math.random() * (maxY - minY);
+    const rand = Math.random();
+    if (rand < 0.35) {
+      this.pipeType = PIPE_TYPE.NORMAL;
+    } else if (rand < 0.55) {
+      this.pipeType = PIPE_TYPE.TOP_ONLY;
+    } else if (rand < 0.75) {
+      this.pipeType = PIPE_TYPE.BOTTOM_ONLY;
+    } else {
+      this.pipeType = PIPE_TYPE.MOVING;
+    }
+
+    this._calcGapPosition();
+  }
+
+  _calcGapPosition() {
+    const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
+
+    switch (this.pipeType) {
+      case PIPE_TYPE.TOP_ONLY: {
+        const maxTop = availableH - BIRD_CLEARANCE;
+        this.gapY = PIPE_MIN_LENGTH + Math.random() * (maxTop - PIPE_MIN_LENGTH);
+        break;
+      }
+      case PIPE_TYPE.BOTTOM_ONLY: {
+        const minBottom = BIRD_CLEARANCE;
+        this.gapY = minBottom + Math.random() * (availableH - PIPE_MIN_LENGTH - minBottom);
+        break;
+      }
+      case PIPE_TYPE.MOVING: {
+        const minY = PIPE_MIN_LENGTH;
+        const maxY = availableH - this.gap - PIPE_MIN_LENGTH;
+        if (maxY <= minY) {
+          this.gapY = availableH / 2 - this.gap / 2;
+        } else {
+          this.gapY = minY + Math.random() * (maxY - minY);
+        }
+        this.baseGapY = this.gapY;
+        break;
+      }
+      default: {
+        const minY = PIPE_MIN_LENGTH;
+        const maxY = availableH - this.gap - PIPE_MIN_LENGTH;
+        if (maxY <= minY) {
+          this.gapY = availableH / 2 - this.gap / 2;
+        } else {
+          this.gapY = minY + Math.random() * (maxY - minY);
+        }
+        break;
+      }
+    }
   }
 
   update() {
     if (GameGlobal.databus.isGameOver) return;
-    this.x -= PIPE_SPEED;
 
-    // 离开屏幕左侧时回收
-    if (this.x + this.width < 0) {
+    this.x -= this.speed;
+
+    if (this.pipeType === PIPE_TYPE.MOVING) {
+      this.movePhase += 0.03;
+      const offset = Math.sin(this.movePhase) * MOVE_RANGE;
+      this.gapY = this.baseGapY + offset;
+      const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
+      this.gapY = Math.max(PIPE_MIN_LENGTH, Math.min(this.gapY, availableH - this.gap - PIPE_MIN_LENGTH));
+    }
+
+    if (this.x + this.width < -20) {
       GameGlobal.databus.removePipe(this);
     }
   }
@@ -44,44 +113,53 @@ export default class Pipe extends Sprite {
   render(ctx) {
     if (!this.visible) return;
 
-    const availableHeight = SCREEN_HEIGHT - GROUND_Y_OFFSET;
+    const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
 
-    // 绘制上方水管（从顶部到gapY）
-    const topHeight = this.gapY;
-    ctx.drawImage(this.topImg, this.x, 0, this.width, topHeight);
+    const hasTop = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.TOP_ONLY || this.pipeType === PIPE_TYPE.MOVING;
+    const hasBottom = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.BOTTOM_ONLY || this.pipeType === PIPE_TYPE.MOVING;
 
-    // 绘制下方水管（从gapY+PIPE_GAP到底部）
-    const bottomY = this.gapY + PIPE_GAP;
-    const bottomHeight = availableHeight - bottomY;
-    if (bottomHeight > 0) {
-      ctx.drawImage(this.bottomImg, this.x, bottomY, this.width, bottomHeight);
+    if (hasTop) {
+      /* 上管：翻转绘制 */
+      const topH = this.gapY;
+      ctx.save();
+      ctx.translate(this.x + this.width / 2, this.gapY);
+      ctx.scale(1, -1);
+      ctx.drawImage(this.pipeImg, -this.width / 2, 0, this.width, topH);
+      ctx.restore();
+    }
+
+    if (hasBottom) {
+      /* 下管：正常绘制 */
+      const bottomY = this.gapY + (hasTop ? this.gap : 0);
+      const bottomH = availableH - bottomY;
+      if (bottomH > 0) {
+        ctx.drawImage(this.pipeImg, this.x, bottomY, this.width, bottomH);
+      }
     }
   }
 
-  // 碰撞检测：小鸟的矩形是否与上水管或下水管重叠
   isCollideWithBird(bird) {
-    const bx = bird.x;
-    const by = bird.y;
-    const bw = bird.width;
-    const bh = bird.height;
+    if (!this.visible || !bird.visible || !bird.isActive) return false;
 
-    // 上水管碰撞
-    if (
-      bx + bw > this.x &&
-      bx < this.x + this.width &&
-      by < this.gapY
-    ) {
-      return true;
-    }
+    const bx = bird.x + HITBOX_SHRINK;
+    const by = bird.y + HITBOX_SHRINK;
+    const bw = bird.width - HITBOX_SHRINK * 2;
+    const bh = bird.height - HITBOX_SHRINK * 2;
 
-    // 下水管碰撞
-    const bottomY = this.gapY + PIPE_GAP;
-    if (
-      bx + bw > this.x &&
-      bx < this.x + this.width &&
-      by + bh > bottomY
-    ) {
-      return true;
+    const px = this.x + 2;
+    const pw = this.width - 4;
+
+    const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
+    const hasTop = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.TOP_ONLY || this.pipeType === PIPE_TYPE.MOVING;
+    const hasBottom = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.BOTTOM_ONLY || this.pipeType === PIPE_TYPE.MOVING;
+
+    if (bx + bw <= px || bx >= px + pw) return false;
+
+    if (hasTop && by < this.gapY) return true;
+
+    if (hasBottom) {
+      const bottomY = this.gapY + (hasTop ? this.gap : 0);
+      if (by + bh > bottomY && bottomY < availableH) return true;
     }
 
     return false;

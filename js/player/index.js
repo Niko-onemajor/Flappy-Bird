@@ -1,56 +1,105 @@
 import Animation from '../base/animation';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 
-const BIRD_IMG_SRC = 'images/hero.png';
-const BIRD_WIDTH = 40;
-const BIRD_HEIGHT = 40;
-const GRAVITY = 0.5;       // 重力加速度
-const JUMP_VELOCITY = -8;  // 跳跃初速度
-const GROUND_Y_OFFSET = 50; // 地面高度偏移
+const BIRD_WIDTH = 34;
+const BIRD_HEIGHT = 24;
+const GRAVITY = 0.18;          /* 重力加速度 */
+const JUMP_VELOCITY = -3.8;    /* 跳跃初速度 */
+const MAX_FALL_SPEED = 5;      /* 最大下落速度 */
+const GROUND_Y_OFFSET = 112;   /* 地面高度 */
+const ROTATION_LERP = 0.08;    /* 旋转平滑系数 */
+const SHIELD_RADIUS = 28;      /* 护盾视觉半径 */
+const SHIELD_PULSE = 0.05;     /* 护盾脉冲速度 */
+const FLAP_INTERVAL = 8;       /* 翅膀动画帧间隔 */
+
+/* 小鸟颜色选择 */
+const BIRD_COLORS = ['redbird', 'bluebird', 'yellowbird'];
+const BIRD_COLOR = BIRD_COLORS[Math.floor(Math.random() * BIRD_COLORS.length)];
+
+/* 小鸟帧图片 */
+const BIRD_FRAMES = [
+  `images/${BIRD_COLOR}-downflap.png`,
+  `images/${BIRD_COLOR}-midflap.png`,
+  `images/${BIRD_COLOR}-upflap.png`,
+];
 
 export default class Player extends Animation {
-  vy = 0; // 垂直速度
+  vy = 0;               /* 垂直速度 */
+  targetRotation = 0;   /* 目标旋转角度 */
+  currentRotation = 0;  /* 当前旋转角度（带惯性） */
+  effectPhase = 0;      /* Buff动画相位 */
+  flapIndex = 0;        /* 翅膀动画帧索引 */
+  flapCounter = 0;      /* 翅膀动画计时器 */
 
   constructor() {
-    super(BIRD_IMG_SRC, BIRD_WIDTH, BIRD_HEIGHT);
+    super(BIRD_FRAMES[0], BIRD_WIDTH, BIRD_HEIGHT);
+    this._loadFrames();
     this.init();
     this.initEvent();
   }
 
+  /* 加载所有帧图片 */
+  _loadFrames() {
+    this.birdFrames = BIRD_FRAMES.map((src) => {
+      const img = wx.createImage();
+      img.src = src;
+      return img;
+    });
+  }
+
   init() {
-    // 小鸟在屏幕左侧 1/4 处，垂直居中
     this.x = SCREEN_WIDTH / 4;
     this.y = SCREEN_HEIGHT / 2;
     this.vy = 0;
     this.isActive = true;
     this.visible = true;
-    this.rotation = 0;
+    this.targetRotation = 0;
+    this.currentRotation = 0;
+    this.effectPhase = 0;
+    this.flapIndex = 0;
+    this.flapCounter = 0;
   }
 
   initEvent() {
     wx.onTouchStart(() => {
+      /* 只在游戏进行中响应触摸 */
+      if (GameGlobal.screenState !== 'playing') return;
       if (GameGlobal.databus.isGameOver) return;
+      /* 跳跃 */
       this.vy = JUMP_VELOCITY;
+      if (GameGlobal.sound) GameGlobal.sound.playWing();
     });
   }
 
   update() {
     if (GameGlobal.databus.isGameOver) return;
 
-    // 重力影响速度
+    /* 重力影响速度 */
     this.vy += GRAVITY;
+    this.vy = Math.min(this.vy, MAX_FALL_SPEED);
     this.y += this.vy;
 
-    // 根据速度计算旋转角度
-    this.rotation = Math.min(this.vy * 3, 45);
+    /* 旋转角度 */
+    this.targetRotation = Math.max(-20, Math.min(this.vy * 3.5, 45));
+    this.currentRotation += (this.targetRotation - this.currentRotation) * ROTATION_LERP;
 
-    // 撞到天花板
-    if (this.y <= 0) {
-      this.y = 0;
-      this.vy = 0;
+    /* Buff动画相位 */
+    this.effectPhase += SHIELD_PULSE;
+
+    /* 翅膀动画 */
+    this.flapCounter++;
+    if (this.flapCounter >= FLAP_INTERVAL) {
+      this.flapCounter = 0;
+      this.flapIndex = (this.flapIndex + 1) % 3;
     }
 
-    // 撞到地面 → 游戏结束
+    /* 撞到天花板 */
+    if (this.y <= 0) {
+      this.y = 0;
+      this.vy = 0.5;
+    }
+
+    /* 撞到地面 → 游戏结束 */
     const groundY = SCREEN_HEIGHT - GROUND_Y_OFFSET - this.height;
     if (this.y >= groundY) {
       this.y = groundY;
@@ -61,12 +110,89 @@ export default class Player extends Animation {
 
   render(ctx) {
     if (!this.visible) return;
-    ctx.save();
+
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
+    const db = GameGlobal.databus;
+
+    /* Buff特效 */
+    if (db.shieldActive) {
+      this._renderShield(ctx, cx, cy);
+    }
+
+    /* 角色本体 */
+    ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate((this.rotation * Math.PI) / 180);
-    ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height);
+    ctx.rotate((this.currentRotation * Math.PI) / 180);
+
+    /* 使用当前帧图片 */
+    const frameImg = this.birdFrames[this.flapIndex];
+    if (frameImg) {
+      ctx.drawImage(frameImg, -this.width / 2, -this.height / 2, this.width, this.height);
+    }
+
+    ctx.restore();
+
+    /* Buff图标 */
+    if (db.shieldActive) {
+      this._renderShieldIcon(ctx, cx, cy);
+    }
+    if (db.scoreMultiplier > 1) {
+      this._renderMultiplierIcon(ctx, cx, cy);
+    }
+  }
+
+  /* 护盾视觉特效 */
+  _renderShield(ctx, cx, cy) {
+    const pulse = 1 + Math.sin(this.effectPhase * 3) * 0.08;
+    const r = SHIELD_RADIUS * pulse;
+
+    ctx.save();
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 15;
+
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 4]);
+    ctx.lineDashOffset = -this.effectPhase * 40;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
+  _renderShieldIcon(ctx, cx, cy) {
+    ctx.save();
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('\uD83D\uDEE1', cx + 18, cy - 18);
+    ctx.fillText('\uD83D\uDEE1', cx + 18, cy - 18);
+    ctx.restore();
+  }
+
+  _renderMultiplierIcon(ctx, cx, cy) {
+    ctx.save();
+    ctx.fillStyle = '#FF5252';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('x2', cx + 18, cy - 5);
+    ctx.fillText('x2', cx + 18, cy - 5);
     ctx.restore();
   }
 
