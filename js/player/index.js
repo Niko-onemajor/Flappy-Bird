@@ -23,6 +23,13 @@ const BIRD_FRAMES = [
   `images/${BIRD_COLOR}-upflap.png`,
 ];
 
+/* 预加载所有小鸟帧图片，避免首次渲染空白 */
+const birdFrameCache = BIRD_FRAMES.map((src) => {
+  const img = wx.createImage();
+  img.src = src;
+  return img;
+});
+
 export default class Player extends Animation {
   vy = 0;               /* 垂直速度 */
   targetRotation = 0;   /* 目标旋转角度 */
@@ -38,13 +45,9 @@ export default class Player extends Animation {
     this.initEvent();
   }
 
-  /* 加载所有帧图片 */
+  /* 加载所有帧图片（从预加载缓存） */
   _loadFrames() {
-    this.birdFrames = BIRD_FRAMES.map((src) => {
-      const img = wx.createImage();
-      img.src = src;
-      return img;
-    });
+    this.birdFrames = birdFrameCache;
   }
 
   init() {

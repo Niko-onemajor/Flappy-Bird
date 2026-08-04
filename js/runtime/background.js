@@ -5,18 +5,26 @@ const BASE_IMG_SRC = 'images/base.png';
 const BASE_HEIGHT = 112;  /* 地面图片高度 */
 const BASE_SPEED = 3;     /* 地面滚动速度 */
 
+/* 预加载背景和地面图片 */
+const bgCache = BG_IMAGES.map((src) => {
+  const img = wx.createImage();
+  img.src = src;
+  return img;
+});
+const baseCache = (() => {
+  const img = wx.createImage();
+  img.src = BASE_IMG_SRC;
+  return img;
+})();
+
 /**
  * 程序化背景：天空图 + 滚动地面
  * 每次游戏随机选择白天/夜晚背景
  */
 export default class BackGround {
   constructor() {
-    this.bgImg = wx.createImage();
-    this.bgImg.src = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)];
-
-    this.baseImg = wx.createImage();
-    this.baseImg.src = BASE_IMG_SRC;
-
+    this.bgImg = bgCache[Math.floor(Math.random() * bgCache.length)];
+    this.baseImg = baseCache;
     this.baseX = 0;
 
     /* 背景缩放比例 */

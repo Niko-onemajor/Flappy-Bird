@@ -4,6 +4,12 @@
  */
 export default class Sound {
   constructor() {
+    /* 背景音乐（循环播放） */
+    this.bgm = wx.createInnerAudioContext();
+    this.bgm.src = 'audio/bgm.mp3';
+    this.bgm.loop = true;
+    this.bgm.volume = 0.25;
+
     /* 翅膀拍打音效 */
     this.wing = this._createAudio('audio/wing.wav', 0.4);
 
@@ -25,6 +31,15 @@ export default class Sound {
     audio.src = src;
     audio.volume = volume;
     return audio;
+  }
+
+  playBgm() {
+    this.bgm.stop();
+    this.bgm.play();
+  }
+
+  stopBgm() {
+    this.bgm.stop();
   }
 
   playWing() {
@@ -54,6 +69,7 @@ export default class Sound {
 
   /* 停止所有音效 */
   stopAll() {
+    this.stopBgm();
     this.wing.stop();
     this.point.stop();
     this.hit.stop();

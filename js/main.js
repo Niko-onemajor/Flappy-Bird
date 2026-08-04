@@ -59,6 +59,7 @@ export default class Main {
     this.player.init();
     this.screenState = SCREEN_STATE.PLAYING;
     GameGlobal.screenState = SCREEN_STATE.PLAYING;
+    GameGlobal.sound.playBgm();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this.loop.bind(this));
   }

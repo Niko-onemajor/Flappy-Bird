@@ -9,6 +9,13 @@ const BIRD_CLEARANCE = 50;      /* 小鸟通过所需最小空间 */
 const MOVE_RANGE = 40;          /* 移动管振荡范围 */
 const HITBOX_SHRINK = 6;        /* 碰撞框内缩（像素） */
 
+/* 预加载水管图片，避免首次渲染时图片未加载完成 */
+const pipeImageCache = PIPE_IMAGES.map((src) => {
+  const img = wx.createImage();
+  img.src = src;
+  return img;
+});
+
 /* 障碍物类型 */
 const PIPE_TYPE = {
   NORMAL: 0,     /* 上下双管 */
@@ -27,8 +34,8 @@ export default class Pipe extends Sprite {
 
   constructor() {
     super('', PIPE_WIDTH, 0);
-    this.pipeImg = wx.createImage();
-    this.pipeImg.src = PIPE_IMAGES[Math.floor(Math.random() * PIPE_IMAGES.length)];
+    /* 从预加载缓存中随机选择水管图片 */
+    this.pipeImg = pipeImageCache[Math.floor(Math.random() * pipeImageCache.length)];
   }
 
   init(gap = 140, speed = 3) {
