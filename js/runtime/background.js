@@ -1,9 +1,8 @@
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { GROUND } from '../config';
 
 const BG_IMAGES = ['images/background-day.png', 'images/background-night.png'];
 const BASE_IMG_SRC = 'images/base.png';
-const BASE_HEIGHT = 112;  /* 地面图片高度 */
-const BASE_SPEED = 3;     /* 地面滚动速度 */
 
 /* 预加载背景和地面图片 */
 const bgCache = BG_IMAGES.map((src) => {
@@ -35,7 +34,7 @@ export default class BackGround {
     if (GameGlobal.databus.isGameOver) return;
 
     /* 地面滚动 */
-    this.baseX = (this.baseX + BASE_SPEED) % 336;  /* base图片宽336 */
+    this.baseX = (this.baseX + GROUND.SPEED) % GROUND.IMG_WIDTH;  /* base图片宽336 */
   }
 
   render(ctx) {
@@ -57,12 +56,12 @@ export default class BackGround {
 
   /* 绘制滚动地面 */
   _drawBase(ctx) {
-    const baseY = SCREEN_HEIGHT - BASE_HEIGHT;
+    const baseY = SCREEN_HEIGHT - GROUND.HEIGHT;
 
-    /* 绘制两段地面实现无缝滚动 */
-    ctx.drawImage(this.baseImg, -this.baseX, baseY, 336, BASE_HEIGHT);
-    ctx.drawImage(this.baseImg, 336 - this.baseX, baseY, 336, BASE_HEIGHT);
+    /* 绘制三段地面实现无缝滚动 */
+    ctx.drawImage(this.baseImg, -this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
+    ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
     /* 补充第三段防止缺口 */
-    ctx.drawImage(this.baseImg, 672 - this.baseX, baseY, 336, BASE_HEIGHT);
+    ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH * 2 - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
   }
 }

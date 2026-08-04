@@ -1,16 +1,17 @@
 import Animation from '../base/animation';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { PLAYER, GROUND } from '../config';
 
-const BIRD_WIDTH = 34;
-const BIRD_HEIGHT = 24;
-const GRAVITY = 0.18;          /* 重力加速度 */
-const JUMP_VELOCITY = -3.8;    /* 跳跃初速度 */
-const MAX_FALL_SPEED = 5;      /* 最大下落速度 */
-const GROUND_Y_OFFSET = 112;   /* 地面高度 */
-const ROTATION_LERP = 0.08;    /* 旋转平滑系数 */
-const SHIELD_RADIUS = 28;      /* 护盾视觉半径 */
-const SHIELD_PULSE = 0.05;     /* 护盾脉冲速度 */
-const FLAP_INTERVAL = 8;       /* 翅膀动画帧间隔 */
+const BIRD_WIDTH = PLAYER.WIDTH;
+const BIRD_HEIGHT = PLAYER.HEIGHT;
+const GRAVITY = PLAYER.GRAVITY;
+const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
+const MAX_FALL_SPEED = PLAYER.MAX_FALL_SPEED;
+const GROUND_Y_OFFSET = GROUND.HEIGHT;
+const ROTATION_LERP = PLAYER.ROTATION_LERP;
+const SHIELD_RADIUS = PLAYER.SHIELD_RADIUS;
+const SHIELD_PULSE = PLAYER.SHIELD_PULSE;
+const FLAP_INTERVAL = PLAYER.FLAP_INTERVAL;
 
 /* 小鸟颜色选择 */
 const BIRD_COLORS = ['redbird', 'bluebird', 'yellowbird'];

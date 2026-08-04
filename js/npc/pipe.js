@@ -1,12 +1,13 @@
 import Sprite from '../base/sprite';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { PIPE, GROUND } from '../config';
 
-const PIPE_WIDTH = 52;
-const GROUND_OFFSET = 112;      /* 地面高度 */
-const PIPE_MIN_LENGTH = 40;     /* 单管最短长度（缩小以适应横屏） */
-const BIRD_CLEARANCE = 55;      /* 小鸟通过所需最小空间（含鸟高度+余量） */
-const MOVE_RANGE = 30;          /* 移动管振荡范围（缩小以减少干扰） */
-const HITBOX_SHRINK = 6;        /* 碰撞框内缩（像素） */
+const PIPE_WIDTH = PIPE.WIDTH;
+const GROUND_OFFSET = GROUND.HEIGHT;
+const PIPE_MIN_LENGTH = PIPE.MIN_LENGTH;
+const BIRD_CLEARANCE = PIPE.CLEARANCE;
+const MOVE_RANGE = PIPE.MOVE_RANGE;
+const HITBOX_SHRINK = PIPE.HITBOX_SHRINK;
 
 /* 预加载水管图片：绿色固定管、红色移动管 */
 const PIPE_GREEN_IMG = (() => { const img = wx.createImage(); img.src = 'images/pipe-green.png'; return img; })();

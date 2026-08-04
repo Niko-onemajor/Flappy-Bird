@@ -1,4 +1,5 @@
 import './render';
+import { SCREEN_WIDTH } from './render';
 import Player from './player/index';
 import Pipe from './npc/pipe';
 import Prop from './npc/prop';
@@ -6,6 +7,7 @@ import BackGround from './runtime/background';
 import GameInfo from './runtime/gameinfo';
 import Sound from './sound';
 import DataBus from './databus';
+import { DIFFICULTY, PIPE, PROP as PROP_CFG } from './config';
 
 const ctx = canvas.getContext('2d');
 
@@ -20,22 +22,6 @@ const SCREEN_STATE = {
 /* 全局屏幕状态，供 gameinfo 等模块读取 */
 GameGlobal.screenState = SCREEN_STATE.HOME;
 
-/* 难度参数 */
-const PIPE_INTERVAL_BASE = 100;   /* 基础水管间隔（帧） */
-const PIPE_INTERVAL_MIN = 60;     /* 最小水管间隔 */
-const PIPE_SPEED_BASE = 3;        /* 基础水管速度 */
-const PIPE_SPEED_MAX = 6.5;       /* 最大水管速度 */
-const PIPE_GAP_BASE = 130;        /* 基础水管间隙 */
-const PIPE_GAP_MIN = 85;          /* 最小水管间隙 */
-const DIFFICULTY_STEP = 5;        /* 每N分提升一次难度 */
-
-/* 水管最小间距：防止两对水管堵死路径 */
-const PIPE_MIN_SPACING = 220;     /* 两对水管之间最小像素距离 */
-
-/* 道具生成参数 */
-const PROP_INTERVAL_BASE = 180;   /* 基础道具间隔（帧），约3秒 */
-const PROP_INTERVAL_MIN = 120;    /* 最小道具间隔 */
-
 /**
  * 横版点击跳跃小游戏主循环
  */
@@ -48,7 +34,6 @@ export default class Main {
 
   /* 水管生成计时器 */
   pipeTimer = 0;
-  lastPipeX = 0;
 
   /* 道具生成计时器 */
   propTimer = 0;
@@ -63,13 +48,13 @@ export default class Main {
   /* 根据当前分数计算难度参数 */
   getDifficulty() {
     const db = GameGlobal.databus;
-    const level = Math.floor(db.score / DIFFICULTY_STEP);
+    const level = Math.floor(db.score / DIFFICULTY.STEP);
 
     return {
-      speed: Math.min(PIPE_SPEED_BASE + level * 0.35, PIPE_SPEED_MAX),
-      gap: Math.max(PIPE_GAP_BASE - level * 5, PIPE_GAP_MIN),
-      interval: Math.max(PIPE_INTERVAL_BASE - level * 4, PIPE_INTERVAL_MIN),
-      propInterval: Math.max(PROP_INTERVAL_BASE - level * 6, PROP_INTERVAL_MIN),
+      speed: Math.min(DIFFICULTY.SPEED_BASE + level * DIFFICULTY.SPEED_INCREMENT, DIFFICULTY.SPEED_MAX),
+      gap: Math.max(DIFFICULTY.GAP_BASE - level * DIFFICULTY.GAP_DECREMENT, DIFFICULTY.GAP_MIN),
+      interval: Math.max(DIFFICULTY.INTERVAL_BASE - level * DIFFICULTY.INTERVAL_DECREMENT, DIFFICULTY.INTERVAL_MIN),
+      propInterval: Math.max(PROP_CFG.INTERVAL_BASE - level * DIFFICULTY.PROP_INTERVAL_DECREMENT, PROP_CFG.INTERVAL_MIN),
     };
   }
 
@@ -90,7 +75,6 @@ export default class Main {
     this.screenState = SCREEN_STATE.PLAYING;
     GameGlobal.screenState = SCREEN_STATE.PLAYING;
     this.pipeTimer = 0;
-    this.lastPipeX = 0;
     this.propTimer = 0;
     GameGlobal.sound.playBgm();
     cancelAnimationFrame(this.aniId);
@@ -102,18 +86,18 @@ export default class Main {
     this.startGame();
   }
 
-  /* 生成水管：计时器 + 最小间距双重保障 */
+  /* 生成水管：计时器 + 直接检查上一对水管实际位置 */
   pipeGenerate() {
     const diff = this.getDifficulty();
 
     this.pipeTimer--;
     if (this.pipeTimer > 0) return;
 
-    /* 检查上一对水管是否已走远，防止两对水管挤在一起 */
-    if (this.lastPipeX > 0) {
-      /* 上一对水管当前X位置（从SCREEN_WIDTH出发，每帧减speed） */
-      const prevX = this.lastPipeX;
-      if (prevX > SCREEN_WIDTH - PIPE_MIN_SPACING) {
+    /* 检查上一对水管是否已走远，防止两对水管挤在一起导致卡死 */
+    const pipes = GameGlobal.databus.pipes;
+    if (pipes.length > 0) {
+      const lastPipe = pipes[pipes.length - 1];
+      if (lastPipe.x > SCREEN_WIDTH - PIPE.MIN_SPACING) {
         return; /* 上一对还没走远，等下一帧 */
       }
     }
@@ -122,11 +106,10 @@ export default class Main {
     pipe.init(diff.gap, diff.speed);
     GameGlobal.databus.pipes.push(pipe);
 
-    this.lastPipeX = pipe.x;
     this.pipeTimer = diff.interval;
   }
 
-  /* 生成道具：计时器 + 最小间距 */
+  /* 生成道具：计时器 + 随机间隔 */
   propGenerate() {
     const diff = this.getDifficulty();
 
@@ -137,7 +120,7 @@ export default class Main {
     prop.init(null, GameGlobal.databus.pipes);
     GameGlobal.databus.props.push(prop);
 
-    this.propTimer = diff.propInterval + Math.floor(Math.random() * 40);
+    this.propTimer = diff.propInterval + Math.floor(Math.random() * PROP_CFG.INTERVAL_RANDOM);
   }
 
   /* 碰撞检测 */

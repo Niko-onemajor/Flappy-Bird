@@ -1,7 +1,6 @@
 import Emitter from '../libs/tinyemitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
-
-const GROUND_OFFSET = 112;  /* 地面高度 */
+import { GROUND } from '../config';
 
 export default class GameInfo extends Emitter {
   constructor() {

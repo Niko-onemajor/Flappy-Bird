@@ -1,13 +1,14 @@
 import Sprite from '../base/sprite';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { PROP, GROUND } from '../config';
 
-const PROP_SIZE = 32;
-const PROP_SPEED = 3;
+const PROP_SIZE = PROP.SIZE;
+const PROP_SPEED = PROP.SPEED;
 const PROP_TYPES = ['shield', 'multiplier'];
-const PROP_DURATION = 300;            /* 道具持续帧数（约5秒） */
-const FLOAT_AMP = 4;                  /* 上下浮动幅度 */
-const FLOAT_SPEED = 0.06;             /* 浮动速度 */
-const PIPE_SAFE_MARGIN = 24;          /* 道具与水管边缘的安全距离 */
+const PROP_DURATION = PROP.DURATION;
+const FLOAT_AMP = PROP.FLOAT_AMP;
+const FLOAT_SPEED = PROP.FLOAT_SPEED;
+const PIPE_SAFE_MARGIN = PROP.SAFE_MARGIN;
 
 /* 道具外观配置 */
 const PROP_STYLE = {
@@ -50,16 +51,20 @@ export default class Prop extends Sprite {
   /* 在水管间隙中找一个安全Y位置，留足边距 */
   _findSafeY(pipes) {
     const safeTop = 50;
-    const safeBottom = SCREEN_HEIGHT - 120;  /* 避开地面 */
+    const safeBottom = SCREEN_HEIGHT - GROUND.HEIGHT - 30;  /* 避开地面 */
 
     /* 找到即将进入屏幕的水管 */
     const nearbyPipes = pipes.filter(
       (p) => p.visible && p.x < SCREEN_WIDTH + 150 && p.x > this.x - 80
     );
 
+    console.log(`[道具生成] 附近水管数量: ${nearbyPipes.length}`);
+
     if (nearbyPipes.length === 0) {
       /* 没有附近水管，在安全区域内随机 */
-      return safeTop + Math.random() * (safeBottom - safeTop);
+      const y = safeTop + Math.random() * (safeBottom - safeTop);
+      console.log(`[道具生成] 无附近水管，安全区域随机生成, y=${y.toFixed(1)}`);
+      return y;
     }
 
     /* 收集所有水管的通行区域 */
@@ -68,24 +73,31 @@ export default class Prop extends Sprite {
       const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
       const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
 
+      console.log(`[道具生成] 水管类型=${pipe.pipeType}, gapY=${pipe.gapY.toFixed(1)}, gap=${pipe.gap}, x=${pipe.x.toFixed(1)}, hasTop=${hasTop}, hasBottom=${hasBottom}`);
+
       if (hasTop && hasBottom) {
         /* 双管：道具放在上下管之间的间隙中央 */
         const gapStart = pipe.gapY + PIPE_SAFE_MARGIN;
         const gapEnd = pipe.gapY + pipe.gap - PIPE_SAFE_MARGIN;
         if (gapEnd - gapStart > PROP_SIZE + 10) {
           safeZones.push({ start: gapStart, end: gapEnd });
+          console.log(`[道具生成] 双管间隙安全区域: ${gapStart.toFixed(1)} ~ ${gapEnd.toFixed(1)}`);
+        } else {
+          console.log(`[道具生成] 双管间隙太小，跳过 (间隙=${(gapEnd - gapStart).toFixed(1)})`);
         }
       } else if (hasTop) {
         /* 只有上管：下方开放区域安全 */
         const zoneStart = pipe.gapY + PIPE_SAFE_MARGIN;
         if (zoneStart < safeBottom) {
           safeZones.push({ start: zoneStart, end: safeBottom });
+          console.log(`[道具生成] 上管下方安全区域: ${zoneStart.toFixed(1)} ~ ${safeBottom.toFixed(1)}`);
         }
       } else if (hasBottom) {
         /* 只有下管：上方开放区域安全 */
         const zoneEnd = pipe.gapY - PIPE_SAFE_MARGIN;
         if (zoneEnd > safeTop) {
           safeZones.push({ start: safeTop, end: zoneEnd });
+          console.log(`[道具生成] 下管上方安全区域: ${safeTop.toFixed(1)} ~ ${zoneEnd.toFixed(1)}`);
         }
       }
     }
@@ -94,12 +106,16 @@ export default class Prop extends Sprite {
       /* 随机选一个安全区域 */
       const zone = safeZones[Math.floor(Math.random() * safeZones.length)];
       if (zone.end > zone.start) {
-        return zone.start + Math.random() * (zone.end - zone.start);
+        const y = zone.start + Math.random() * (zone.end - zone.start);
+        console.log(`[道具生成] 在水管间隙生成, y=${y.toFixed(1)}, 区域=${zone.start.toFixed(1)}~${zone.end.toFixed(1)}`);
+        return y;
       }
     }
 
     /* 兜底：屏幕中央 */
-    return (safeTop + safeBottom) / 2;
+    const y = (safeTop + safeBottom) / 2;
+    console.log(`[道具生成] 无安全区域，兜底中央位置, y=${y.toFixed(1)}`);
+    return y;
   }
 
   update() {
