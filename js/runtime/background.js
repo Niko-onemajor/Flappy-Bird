@@ -3,6 +3,9 @@ import { GROUND } from '../config';
 
 const BG_IMAGES = ['images/background-day.png', 'images/background-night.png'];
 const BASE_IMG_SRC = 'images/base.png';
+const BG_SCROLL_SPEED = 0.8;  /* 背景视差滚动速度（远慢于地面） */
+const BG_IMG_W = 288;         /* 背景图片原始宽度 */
+const BG_IMG_H = 512;         /* 背景图片原始高度 */
 
 /* 预加载背景和地面图片 */
 const bgCache = BG_IMAGES.map((src) => {
@@ -17,7 +20,7 @@ const baseCache = (() => {
 })();
 
 /**
- * 程序化背景：天空图 + 滚动地面
+ * 程序化背景：天空图（视差滚动） + 滚动地面
  * 每次游戏随机选择白天/夜晚背景
  */
 export default class BackGround {
@@ -25,16 +28,23 @@ export default class BackGround {
     this.bgImg = bgCache[Math.floor(Math.random() * bgCache.length)];
     this.baseImg = baseCache;
     this.baseX = 0;
+    this.bgOffsetX = 0;
 
-    /* 背景缩放比例 */
-    this.bgScale = SCREEN_HEIGHT / 512;  /* 原始512高 */
+    /* 背景缩放：高度填满地面以上区域 */
+    const skyH = SCREEN_HEIGHT - GROUND.HEIGHT;
+    this.bgScale = skyH / BG_IMG_H;
+    this.bgDrawW = BG_IMG_W * this.bgScale;
+    this.bgDrawH = skyH;
   }
 
   update() {
     if (GameGlobal.databus.isGameOver) return;
 
-    /* 地面滚动 */
-    this.baseX = (this.baseX + GROUND.SPEED) % GROUND.IMG_WIDTH;  /* base图片宽336 */
+    /* 地面滚动（快） */
+    this.baseX = (this.baseX + GROUND.SPEED) % GROUND.IMG_WIDTH;
+
+    /* 背景视差滚动（慢），营造远景深度感 */
+    this.bgOffsetX = (this.bgOffsetX + BG_SCROLL_SPEED) % this.bgDrawW;
   }
 
   render(ctx) {
@@ -42,16 +52,16 @@ export default class BackGround {
     this._drawBase(ctx);
   }
 
-  /* 绘制天空背景 */
+  /* 绘制天空背景（水平视差滚动） */
   _drawBg(ctx) {
-    const bgH = 512 * this.bgScale;
-    /* 背景拉伸填满天空区域 */
-    ctx.drawImage(this.bgImg, 0, 0, SCREEN_WIDTH, bgH);
-    /* 下方用纯色填充 */
-    if (bgH < SCREEN_HEIGHT) {
-      ctx.fillStyle = '#71c5cf';
-      ctx.fillRect(0, bgH, SCREEN_WIDTH, SCREEN_HEIGHT - bgH);
-    }
+    const w = this.bgDrawW;
+    const h = this.bgDrawH;
+
+    /* 绘制两段背景实现无缝视差滚动 */
+    ctx.drawImage(this.bgImg, -this.bgOffsetX, 0, w, h);
+    ctx.drawImage(this.bgImg, w - this.bgOffsetX, 0, w, h);
+    /* 补充第三段防止极端情况缺口 */
+    ctx.drawImage(this.bgImg, w * 2 - this.bgOffsetX, 0, w, h);
   }
 
   /* 绘制滚动地面 */
@@ -61,7 +71,6 @@ export default class BackGround {
     /* 绘制三段地面实现无缝滚动 */
     ctx.drawImage(this.baseImg, -this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
     ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
-    /* 补充第三段防止缺口 */
     ctx.drawImage(this.baseImg, GROUND.IMG_WIDTH * 2 - this.baseX, baseY, GROUND.IMG_WIDTH, GROUND.HEIGHT);
   }
 }
