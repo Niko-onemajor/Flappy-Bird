@@ -20,15 +20,21 @@ const SCREEN_STATE = {
 /* 全局屏幕状态，供 gameinfo 等模块读取 */
 GameGlobal.screenState = SCREEN_STATE.HOME;
 
-/* 固定游戏参数 */
+/* 难度参数 */
 const PIPE_INTERVAL_BASE = 100;   /* 基础水管间隔（帧） */
-const PIPE_INTERVAL_MIN = 55;     /* 最小水管间隔 */
+const PIPE_INTERVAL_MIN = 60;     /* 最小水管间隔 */
 const PIPE_SPEED_BASE = 3;        /* 基础水管速度 */
 const PIPE_SPEED_MAX = 6.5;       /* 最大水管速度 */
 const PIPE_GAP_BASE = 130;        /* 基础水管间隙 */
-const PIPE_GAP_MIN = 80;          /* 最小水管间隙 */
-const PROP_SPAWN_RATE = 0.005;    /* 道具生成概率 */
+const PIPE_GAP_MIN = 85;          /* 最小水管间隙 */
 const DIFFICULTY_STEP = 5;        /* 每N分提升一次难度 */
+
+/* 水管最小间距：防止两对水管堵死路径 */
+const PIPE_MIN_SPACING = 220;     /* 两对水管之间最小像素距离 */
+
+/* 道具生成参数 */
+const PROP_INTERVAL_BASE = 180;   /* 基础道具间隔（帧），约3秒 */
+const PROP_INTERVAL_MIN = 120;    /* 最小道具间隔 */
 
 /**
  * 横版点击跳跃小游戏主循环
@@ -39,6 +45,13 @@ export default class Main {
   player = new Player();
   gameInfo = new GameInfo();
   screenState = SCREEN_STATE.HOME;
+
+  /* 水管生成计时器 */
+  pipeTimer = 0;
+  lastPipeX = 0;
+
+  /* 道具生成计时器 */
+  propTimer = 0;
 
   constructor() {
     this.gameInfo.on('start', this.startGame.bind(this));
@@ -56,6 +69,7 @@ export default class Main {
       speed: Math.min(PIPE_SPEED_BASE + level * 0.35, PIPE_SPEED_MAX),
       gap: Math.max(PIPE_GAP_BASE - level * 5, PIPE_GAP_MIN),
       interval: Math.max(PIPE_INTERVAL_BASE - level * 4, PIPE_INTERVAL_MIN),
+      propInterval: Math.max(PROP_INTERVAL_BASE - level * 6, PROP_INTERVAL_MIN),
     };
   }
 
@@ -75,6 +89,9 @@ export default class Main {
     this.player.init();
     this.screenState = SCREEN_STATE.PLAYING;
     GameGlobal.screenState = SCREEN_STATE.PLAYING;
+    this.pipeTimer = 0;
+    this.lastPipeX = 0;
+    this.propTimer = 0;
     GameGlobal.sound.playBgm();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this.loop.bind(this));
@@ -85,23 +102,42 @@ export default class Main {
     this.startGame();
   }
 
-  /* 生成水管 */
+  /* 生成水管：计时器 + 最小间距双重保障 */
   pipeGenerate() {
     const diff = this.getDifficulty();
-    if (GameGlobal.databus.frame % diff.interval === 0) {
-      const pipe = GameGlobal.databus.pool.getItemByClass('pipe', Pipe);
-      pipe.init(diff.gap, diff.speed);
-      GameGlobal.databus.pipes.push(pipe);
+
+    this.pipeTimer--;
+    if (this.pipeTimer > 0) return;
+
+    /* 检查上一对水管是否已走远，防止两对水管挤在一起 */
+    if (this.lastPipeX > 0) {
+      /* 上一对水管当前X位置（从SCREEN_WIDTH出发，每帧减speed） */
+      const prevX = this.lastPipeX;
+      if (prevX > SCREEN_WIDTH - PIPE_MIN_SPACING) {
+        return; /* 上一对还没走远，等下一帧 */
+      }
     }
+
+    const pipe = GameGlobal.databus.pool.getItemByClass('pipe', Pipe);
+    pipe.init(diff.gap, diff.speed);
+    GameGlobal.databus.pipes.push(pipe);
+
+    this.lastPipeX = pipe.x;
+    this.pipeTimer = diff.interval;
   }
 
-  /* 生成道具 */
+  /* 生成道具：计时器 + 最小间距 */
   propGenerate() {
-    if (Math.random() < PROP_SPAWN_RATE) {
-      const prop = GameGlobal.databus.pool.getItemByClass('prop', Prop);
-      prop.init(null, GameGlobal.databus.pipes);
-      GameGlobal.databus.props.push(prop);
-    }
+    const diff = this.getDifficulty();
+
+    this.propTimer--;
+    if (this.propTimer > 0) return;
+
+    const prop = GameGlobal.databus.pool.getItemByClass('prop', Prop);
+    prop.init(null, GameGlobal.databus.pipes);
+    GameGlobal.databus.props.push(prop);
+
+    this.propTimer = diff.propInterval + Math.floor(Math.random() * 40);
   }
 
   /* 碰撞检测 */

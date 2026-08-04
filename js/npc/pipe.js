@@ -5,7 +5,7 @@ const PIPE_WIDTH = 52;
 const GROUND_OFFSET = 112;      /* 地面高度 */
 const PIPE_MIN_LENGTH = 40;     /* 单管最短长度（缩小以适应横屏） */
 const BIRD_CLEARANCE = 55;      /* 小鸟通过所需最小空间（含鸟高度+余量） */
-const MOVE_RANGE = 40;          /* 移动管振荡范围 */
+const MOVE_RANGE = 30;          /* 移动管振荡范围（缩小以减少干扰） */
 const HITBOX_SHRINK = 6;        /* 碰撞框内缩（像素） */
 
 /* 预加载水管图片：绿色固定管、红色移动管 */
@@ -43,14 +43,14 @@ export default class Pipe extends Sprite {
     this.movePhase = Math.random() * Math.PI * 2;
 
     const rand = Math.random();
-    if (rand < 0.40) {
+    if (rand < 0.45) {
       this.pipeType = PIPE_TYPE.NORMAL;
-    } else if (rand < 0.60) {
+    } else if (rand < 0.65) {
       this.pipeType = PIPE_TYPE.TOP_ONLY;
-    } else if (rand < 0.80) {
+    } else if (rand < 0.85) {
       this.pipeType = PIPE_TYPE.BOTTOM_ONLY;
     } else {
-      this.pipeType = PIPE_TYPE.MOVING;
+      this.pipeType = PIPE_TYPE.MOVING;  /* 仅15%，降低移动管干扰 */
     }
 
     /* 移动管用红色，固定管用绿色，便于玩家区分 */

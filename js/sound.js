@@ -1,29 +1,29 @@
 /**
  * 音效管理器
- * 使用原始Flappy Bird音效素材
+ * 音量平衡：背景音乐 < 音效反馈，避免互相压盖
  */
 export default class Sound {
   constructor() {
-    /* 背景音乐（循环播放） */
+    /* 背景音乐（循环播放，音量最低） */
     this.bgm = wx.createInnerAudioContext();
     this.bgm.src = 'audio/bgm.mp3';
     this.bgm.loop = true;
-    this.bgm.volume = 0.25;
+    this.bgm.volume = 0.12;
 
     /* 翅膀拍打音效 */
-    this.wing = this._createAudio('audio/wing.wav', 0.4);
+    this.wing = this._createAudio('audio/wing.wav', 0.25);
 
     /* 得分音效 */
-    this.point = this._createAudio('audio/point.wav', 0.5);
+    this.point = this._createAudio('audio/point.wav', 0.3);
 
     /* 碰撞音效 */
-    this.hit = this._createAudio('audio/hit.wav', 0.6);
+    this.hit = this._createAudio('audio/hit.wav', 0.35);
 
     /* 死亡音效 */
-    this.die = this._createAudio('audio/die.wav', 0.5);
+    this.die = this._createAudio('audio/die.wav', 0.3);
 
     /* 俯冲音效 */
-    this.swoosh = this._createAudio('audio/swoosh.wav', 0.4);
+    this.swoosh = this._createAudio('audio/swoosh.wav', 0.25);
   }
 
   _createAudio(src, volume) {
