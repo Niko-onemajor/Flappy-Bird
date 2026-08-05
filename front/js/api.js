@@ -11,7 +11,7 @@
  *
  * 查看电脑 IP：PowerShell 输入 ipconfig → 找 "无线局域网适配器 WLAN" 下的 IPv4 地址
  * ───────────────────────────────────────────── */
-const DEV_IP = 'localhost';  // ← 真机调试时改为你的电脑 IP
+const DEV_IP = '192.168.1.11';  // 真机调试用电脑IP，模拟器调试改回 localhost
 const API_PORT = 5205;
 const API_BASE = `http://${DEV_IP}:${API_PORT}`;
 
