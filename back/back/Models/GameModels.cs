@@ -66,4 +66,8 @@ public class PropState
     public bool Collected { get; set; }
     public double Speed { get; set; } = 3;
     public double AnimPhase { get; set; }
+
+    /// <summary>关联的水管（用于移动水管时道具跟随gap移动），不序列化到API响应</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public PipeState? ParentPipe { get; set; }
 }

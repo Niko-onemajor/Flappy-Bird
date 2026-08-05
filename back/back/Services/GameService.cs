@@ -30,17 +30,17 @@ public class GameService
     private const int PROP_DURATION = 300;
     private const double PROP_SAFE_MARGIN = 24;
 
-    /* 难度参数 */
-    private const int DIFFICULTY_STEP = 8;
+    /* 难度参数 - 难度曲线延伸至约200分，越往后越难 */
+    private const int DIFFICULTY_STEP = 6;
     private const double SPEED_BASE = 3.2;
-    private const double SPEED_MAX = 8.5;
-    private const double SPEED_INCREMENT = 0.4;
+    private const double SPEED_MAX = 18;
+    private const double SPEED_INCREMENT = 0.45;
     private const double GAP_BASE = 125;
-    private const double GAP_MIN = 72;
-    private const double GAP_DECREMENT = 3.5;
+    private const double GAP_MIN = 58;
+    private const double GAP_DECREMENT = 2;
     private const double INTERVAL_BASE = 100;
-    private const double INTERVAL_MIN = 48;
-    private const double INTERVAL_DECREMENT = 3.5;
+    private const double INTERVAL_MIN = 30;
+    private const double INTERVAL_DECREMENT = 2;
     private const double PROP_CHANCE_BASE = 0.35;
     private const double PROP_CHANCE_INCREMENT = 0.03;
 
@@ -307,7 +307,7 @@ public class GameService
 
     /// <summary>
     /// 为指定水管创建道具，道具放在水管间隙的中央位置。
-    /// 道具与水管同速移动，因此始终保持在间隙内，玩家通过水管时自然能获取。
+    /// 道具与水管同速移动，对于移动水管（type 3），道具会跟随 gap 上下移动。
     /// </summary>
     private PropState CreatePropForPipe(GameSession s, PipeState pipe, double pipeSpeed)
     {
@@ -317,6 +317,7 @@ public class GameService
             X = pipe.X + PIPE_WIDTH / 2 - PROP_SIZE / 2,  /* 与水管 X 中心对齐 */
             Speed = pipeSpeed,
             AnimPhase = _rng.NextDouble() * Math.PI * 2,
+            ParentPipe = pipe,  /* 关联水管，用于移动水管时道具跟随 gap 移动 */
         };
 
         var availableH = s.ScreenHeight - GROUND_HEIGHT;
@@ -325,21 +326,29 @@ public class GameService
 
         if (hasTop && hasBottom)
         {
-            /* 双管：放在间隙中央，限制在安全区域内 */
+            /* 双管：放在间隙中央 */
             var gapCenter = pipe.GapY + pipe.Gap / 2;
-            prop.Y = Math.Clamp(gapCenter - PROP_SIZE / 2, 50.0, availableH - PROP_SIZE - 30.0);
+            prop.Y = gapCenter - PROP_SIZE / 2;
         }
         else if (hasBottom)
         {
-            /* 只有下管：放在下管上方，留出安全边距 */
+            /* 只有下管：放在下管上方，确保玩家从上方通过时可获取 */
+            var minY = 50.0;
             var maxY = pipe.GapY - PROP_SAFE_MARGIN - PROP_SIZE;
-            prop.Y = Math.Clamp(maxY, 50.0, availableH - PROP_SIZE - 30.0);
+            if (maxY < minY)
+                prop.Y = minY;
+            else
+                prop.Y = minY + (maxY - minY) * 0.4;  /* 偏上1/3处，更自然 */
         }
         else
         {
-            /* 只有上管：放在上管下方，留出安全边距 */
+            /* 只有上管：放在上管下方，确保玩家从下方通过时可获取 */
             var minY = pipe.GapY + PROP_SAFE_MARGIN;
-            prop.Y = Math.Clamp(minY, 50.0, availableH - PROP_SIZE - 30.0);
+            var maxY = availableH - PROP_SIZE - 30.0;
+            if (maxY < minY)
+                prop.Y = minY;
+            else
+                prop.Y = minY + (maxY - minY) * 0.5;  /* 中间位置 */
         }
 
         return prop;
@@ -351,6 +360,14 @@ public class GameService
         {
             var prop = s.Props[i];
             prop.X -= prop.Speed;
+
+            /* 跟随移动水管：道具 Y 始终保持在 gap 中央 */
+            if (prop.ParentPipe != null && prop.ParentPipe.IsMoving)
+            {
+                var pipe = prop.ParentPipe;
+                var gapCenter = pipe.GapY + pipe.Gap / 2;
+                prop.Y = gapCenter - PROP_SIZE / 2;
+            }
 
             if (prop.X + PROP_SIZE < -10)
             {
