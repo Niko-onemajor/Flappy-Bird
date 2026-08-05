@@ -30,15 +30,15 @@ public class GameService
     private const int PROP_DURATION = 300;
     private const double PROP_SAFE_MARGIN = 24;
 
-    /* 难度参数 - 难度曲线延伸至约200分，越往后越难 */
+    /* 难度参数 - 难度曲线延伸至约200分，起始难度适中 */
     private const int DIFFICULTY_STEP = 6;
-    private const double SPEED_BASE = 3.2;
+    private const double SPEED_BASE = 4.2;
     private const double SPEED_MAX = 18;
     private const double SPEED_INCREMENT = 0.45;
-    private const double GAP_BASE = 125;
+    private const double GAP_BASE = 112;
     private const double GAP_MIN = 58;
     private const double GAP_DECREMENT = 2;
-    private const double INTERVAL_BASE = 100;
+    private const double INTERVAL_BASE = 85;
     private const double INTERVAL_MIN = 30;
     private const double INTERVAL_DECREMENT = 2;
     private const double PROP_CHANCE_BASE = 0.35;
@@ -336,7 +336,8 @@ public class GameService
             var minY = 50.0;
             var maxY = pipe.GapY - PROP_SAFE_MARGIN - PROP_SIZE;
             if (maxY < minY)
-                prop.Y = minY;
+                /* 管道太靠上，道具紧贴管道上方（缩小安全边距） */
+                prop.Y = Math.Max(50.0, pipe.GapY - PROP_SIZE - 4);
             else
                 prop.Y = minY + (maxY - minY) * 0.4;  /* 偏上1/3处，更自然 */
         }
