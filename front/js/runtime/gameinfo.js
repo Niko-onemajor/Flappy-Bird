@@ -14,6 +14,25 @@ export default class GameInfo extends Emitter {
       endY: SCREEN_HEIGHT / 2 + 70,
     };
 
+    /* 排行榜按钮 */
+    this.leaderboardBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 60,
+      startY: SCREEN_HEIGHT / 2 + 80,
+      endX: SCREEN_WIDTH / 2 + 60,
+      endY: SCREEN_HEIGHT / 2 + 120,
+    };
+
+    /* 排行榜返回按钮 */
+    this.backBtnArea = {
+      startX: 20,
+      startY: 20,
+      endX: 80,
+      endY: 55,
+    };
+
+    /* 排行榜数据 */
+    this._leaderboardData = null;
+
     /* 游戏结束按钮 */
     this.btnArea = {
       startX: SCREEN_WIDTH / 2 - 80,
@@ -73,7 +92,8 @@ export default class GameInfo extends Emitter {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('开始游戏', SCREEN_WIDTH / 2, btn.startY + 32);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('开始游戏', SCREEN_WIDTH / 2, (btn.startY + btn.endY) / 2);
 
     /* 最高分 */
     const best = this._getBestScore();
@@ -84,6 +104,114 @@ export default class GameInfo extends Emitter {
       ctx.font = 'bold 14px Arial';
       ctx.strokeText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
       ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
+    }
+
+    /* 排行榜按钮 */
+    const lbBtn = this.leaderboardBtnArea;
+    ctx.fillStyle = '#2196F3';
+    ctx.strokeStyle = '#0D47A1';
+    ctx.lineWidth = 3;
+    const lbRx = 10;
+    this._roundRect(ctx, lbBtn.startX, lbBtn.startY, lbBtn.endX - lbBtn.startX, lbBtn.endY - lbBtn.startY, lbRx);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('排行榜', SCREEN_WIDTH / 2, (lbBtn.startY + lbBtn.endY) / 2);
+  }
+
+  /* ========== 排行榜渲染 ========== */
+  renderLeaderboard(ctx) {
+    /* 半透明背景 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 标题 */
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('排行榜', SCREEN_WIDTH / 2, 50);
+
+    /* 返回按钮 */
+    const backBtn = this.backBtnArea;
+    ctx.fillStyle = '#555555';
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, backBtn.startX, backBtn.startY, backBtn.endX - backBtn.startX, backBtn.endY - backBtn.startY, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('← 返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
+
+    const data = this._leaderboardData;
+    if (!data || data.length === 0) {
+      ctx.fillStyle = '#aaaaaa';
+      ctx.font = '16px Arial';
+      ctx.fillText('暂无数据', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+      return;
+    }
+
+    /* 表头 */
+    const tableTop = 90;
+    const rowH = 36;
+    ctx.font = 'bold 14px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('排名', 50, tableTop);
+    ctx.fillText('玩家', 120, tableTop);
+    ctx.fillText('分数', 240, tableTop);
+    ctx.fillText('时间', 320, tableTop);
+
+    /* 分割线 */
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(20, tableTop + 10);
+    ctx.lineTo(SCREEN_WIDTH - 20, tableTop + 10);
+    ctx.stroke();
+
+    /* 排行数据 */
+    const medals = ['🥇', '🥈', '🥉'];
+    const maxShow = Math.min(data.length, 10);
+
+    for (let i = 0; i < maxShow; i++) {
+      const row = data[i];
+      const y = tableTop + 30 + i * rowH;
+
+      /* 交替行背景 */
+      if (i % 2 === 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(20, y - 10, SCREEN_WIDTH - 40, rowH - 4);
+      }
+
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+
+      /* 排名 */
+      const rank = i < 3 ? medals[i] : `${i + 1}`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(rank, 50, y);
+
+      /* 玩家名 */
+      const name = row.playerName.length > 8 ? row.playerName.substring(0, 8) + '..' : row.playerName;
+      ctx.fillText(name, 100, y);
+
+      /* 分数 */
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(String(row.score), 240, y);
+
+      /* 时间 */
+      ctx.fillStyle = '#aaaaaa';
+      ctx.font = '11px Arial';
+      const d = new Date(row.createdAt);
+      const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      ctx.fillText(timeStr, 300, y);
     }
   }
 
@@ -185,21 +313,46 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 服务端道具状态栏 */
+  /* 服务端道具状态栏 - 放大且更明显 */
   renderPropBarServer(ctx, gameState) {
-    const barY = SCREEN_HEIGHT - 15;
-    const barX = SCREEN_WIDTH / 2 - 60;
-    ctx.font = '12px Arial';
+    const barY = SCREEN_HEIGHT - 40;
+    const barX = SCREEN_WIDTH / 2 - 120;
+    ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
     if (gameState.shieldActive) {
-      ctx.fillStyle = '#FFD700';
-      ctx.fillText(`护盾 ${Math.ceil(gameState.shieldTimer / 60)}s`, barX, barY);
+      /* 黄色背景高亮 */
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+      ctx.strokeStyle = '#FFA000';
+      ctx.lineWidth = 2;
+      const bx = barX;
+      const bw = 100;
+      const bh = 28;
+      ctx.beginPath();
+      this._roundRect(ctx, bx, barY - bh / 2, bw, bh, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#000000';
+      ctx.fillText(`🛡 护盾 ${Math.ceil(gameState.shieldTimer / 60)}s`, bx + bw / 2, barY);
     }
 
     if (gameState.scoreMultiplier > 1) {
-      ctx.fillStyle = '#FF5252';
-      ctx.fillText(`x2 ${Math.ceil(gameState.multiplierTimer / 60)}s`, barX + 80, barY);
+      /* 红色背景高亮 */
+      ctx.fillStyle = 'rgba(255, 82, 82, 0.8)';
+      ctx.strokeStyle = '#D32F2F';
+      ctx.lineWidth = 2;
+      const bx = barX + 140;
+      const bw = 100;
+      const bh = 28;
+      ctx.beginPath();
+      this._roundRect(ctx, bx, barY - bh / 2, bw, bh, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(`x2 ${Math.ceil(gameState.multiplierTimer / 60)}s`, bx + bw / 2, barY);
     }
   }
 
@@ -239,13 +392,15 @@ export default class GameInfo extends Emitter {
     ctx.fillRect(this.btnArea.startX, this.btnArea.startY, 160, 40);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 18px Arial';
-    ctx.fillText('重新开始', SCREEN_WIDTH / 2, this.btnArea.startY + 28);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('重新开始', SCREEN_WIDTH / 2, (this.btnArea.startY + this.btnArea.endY) / 2);
 
     /* 返回主页按钮 */
     ctx.fillStyle = '#2196F3';
     ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('返回主页', SCREEN_WIDTH / 2, this.menuBtnArea.startY + 28);
+    ctx.fillText('返回主页', SCREEN_WIDTH / 2, (this.menuBtnArea.startY + this.menuBtnArea.endY) / 2);
   }
 
   /* 服务端版游戏结束 */
@@ -279,12 +434,14 @@ export default class GameInfo extends Emitter {
     ctx.fillRect(this.btnArea.startX, this.btnArea.startY, 160, 40);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 18px Arial';
-    ctx.fillText('重新开始', SCREEN_WIDTH / 2, this.btnArea.startY + 28);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('重新开始', SCREEN_WIDTH / 2, (this.btnArea.startY + this.btnArea.endY) / 2);
 
     ctx.fillStyle = '#2196F3';
     ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('返回主页', SCREEN_WIDTH / 2, this.menuBtnArea.startY + 28);
+    ctx.fillText('返回主页', SCREEN_WIDTH / 2, (this.menuBtnArea.startY + this.menuBtnArea.endY) / 2);
   }
 
   /* ========== 触摸事件 ========== */
@@ -300,6 +457,29 @@ export default class GameInfo extends Emitter {
         clientY <= this.homeBtnArea.endY
       ) {
         this.emit('start');
+        return;
+      }
+      if (
+        clientX >= this.leaderboardBtnArea.startX &&
+        clientX <= this.leaderboardBtnArea.endX &&
+        clientY >= this.leaderboardBtnArea.startY &&
+        clientY <= this.leaderboardBtnArea.endY
+      ) {
+        this.emit('showLeaderboard');
+        return;
+      }
+      return;
+    }
+
+    /* 排行榜：点击返回按钮 */
+    if (GameGlobal.screenState === 'leaderboard') {
+      if (
+        clientX >= this.backBtnArea.startX &&
+        clientX <= this.backBtnArea.endX &&
+        clientY >= this.backBtnArea.startY &&
+        clientY <= this.backBtnArea.endY
+      ) {
+        this.emit('backToHome');
       }
       return;
     }

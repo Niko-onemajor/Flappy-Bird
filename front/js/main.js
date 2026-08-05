@@ -1,6 +1,6 @@
 import './render';
 import { SCREEN_WIDTH } from './render';
-import { startGame, gameTick, gameFlap, submitScore } from './api';
+import { startGame, gameTick, gameFlap, submitScore, getTopScores } from './api';
 import BackGround from './runtime/background';
 import GameInfo from './runtime/gameinfo';
 import Sound from './sound';
@@ -13,6 +13,7 @@ const SCREEN_STATE = {
   HOME: 'home',
   READY: 'ready',
   PLAYING: 'playing',
+  LEADERBOARD: 'leaderboard',
 };
 
 /* 全局屏幕状态 */
@@ -41,6 +42,7 @@ export default class Main {
     this.gameInfo.on('restart', this.restartGame.bind(this));
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
     this.gameInfo.on('flap', this.flap.bind(this));
+    this.gameInfo.on('showLeaderboard', this.showLeaderboard.bind(this));
     this.loop();
   }
 
@@ -136,6 +138,20 @@ export default class Main {
     }
   }
 
+  /* 显示排行榜 */
+  async showLeaderboard() {
+    this.screenState = SCREEN_STATE.LEADERBOARD;
+    GameGlobal.screenState = SCREEN_STATE.LEADERBOARD;
+    try {
+      const data = await getTopScores(10);
+      this.gameInfo._leaderboardData = data;
+    } catch (err) {
+      console.error('[Main] 获取排行榜失败:', err);
+    }
+    cancelAnimationFrame(this.aniId);
+    this.aniId = requestAnimationFrame(this.loop.bind(this));
+  }
+
   /* 提交分数 */
   async submitScoreToServer() {
     if (!this.gameState || this.gameState.score <= 0) return;
@@ -153,6 +169,9 @@ export default class Main {
     if (this.screenState === SCREEN_STATE.HOME) {
       this.bg.render(ctx);
       this.gameInfo.renderHome(ctx);
+    } else if (this.screenState === SCREEN_STATE.LEADERBOARD) {
+      this.bg.render(ctx);
+      this.gameInfo.renderLeaderboard(ctx);
     } else if (this.screenState === SCREEN_STATE.READY) {
       this.bg.render(ctx);
       if (this.gameState) {

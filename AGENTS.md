@@ -32,6 +32,8 @@
 
 | dotnet ef database update | 应用迁移到数据库 |
 
+> **重要**：后端服务必须由开发者在 VS Code 终端中手动启动（`dotnet run`），不得由 AI 代理自动启动或重启后端进程。
+
 
 
 \### Git

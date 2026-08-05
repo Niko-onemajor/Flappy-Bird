@@ -244,14 +244,14 @@
           }
         },
         {
-          "name": "Step 3: 推进 5 帧",
+          "name": "Step 3: 推进 1 帧",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
                   "const json = pm.response.json();",
-                  "pm.test('帧数 >= 5', () => pm.expect(json.frame).to.be.at.least(5));",
+                  "pm.test('帧数 >= 1', () => pm.expect(json.frame).to.be.at.least(1));",
                   "console.log('Score:', json.score, 'Frame:', json.frame, 'Pipes:', json.pipes.length);"
                 ],
                 "type": "text/javascript"

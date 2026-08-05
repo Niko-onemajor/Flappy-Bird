@@ -11,7 +11,7 @@ public class GameService
     /* ========== 游戏常量 - 与前端 config.js 保持一致 ========== */
     private const double PIPE_WIDTH = 52;
     private const double PIPE_MIN_LENGTH = 40;
-    private const double BIRD_CLEARANCE = 55;
+    private const double BIRD_CLEARANCE = 80;
     private const double MOVE_RANGE = 30;
     private const double MIN_SPACING = 220;
     private const double HITBOX_SHRINK = 6;
@@ -31,20 +31,18 @@ public class GameService
     private const double PROP_SAFE_MARGIN = 24;
 
     /* 难度参数 */
-    private const int DIFFICULTY_STEP = 5;
-    private const double SPEED_BASE = 3;
-    private const double SPEED_MAX = 6.5;
-    private const double SPEED_INCREMENT = 0.35;
-    private const double GAP_BASE = 130;
-    private const double GAP_MIN = 85;
-    private const double GAP_DECREMENT = 5;
+    private const int DIFFICULTY_STEP = 8;
+    private const double SPEED_BASE = 3.2;
+    private const double SPEED_MAX = 8.5;
+    private const double SPEED_INCREMENT = 0.4;
+    private const double GAP_BASE = 125;
+    private const double GAP_MIN = 72;
+    private const double GAP_DECREMENT = 3.5;
     private const double INTERVAL_BASE = 100;
-    private const double INTERVAL_MIN = 60;
-    private const double INTERVAL_DECREMENT = 4;
-    private const double PROP_INTERVAL_BASE = 180;
-    private const double PROP_INTERVAL_MIN = 120;
-    private const double PROP_INTERVAL_DECREMENT = 6;
-    private const double PROP_INTERVAL_RANDOM = 40;
+    private const double INTERVAL_MIN = 48;
+    private const double INTERVAL_DECREMENT = 3.5;
+    private const double PROP_CHANCE_BASE = 0.35;
+    private const double PROP_CHANCE_INCREMENT = 0.03;
 
     private static readonly string[] PROP_TYPES = ["shield", "multiplier"];
     private static readonly Random _rng = new();
@@ -87,7 +85,6 @@ public class GameService
 
         UpdatePlayer(s);
         GeneratePipes(s);
-        GenerateProps(s);
         UpdatePipes(s);
         UpdateProps(s);
         CheckCollisions(s);
@@ -161,23 +158,23 @@ public class GameService
 
     /* ========== 难度计算 ========== */
 
-    private (double speed, double gap, double interval, double propInterval) GetDifficulty(GameSession s)
+    private (double speed, double gap, double interval, double propChance) GetDifficulty(GameSession s)
     {
         var level = s.Score / DIFFICULTY_STEP;
 
         var speed = Math.Min(SPEED_BASE + level * SPEED_INCREMENT, SPEED_MAX);
         var gap = Math.Max(GAP_BASE - level * GAP_DECREMENT, GAP_MIN);
         var interval = Math.Max(INTERVAL_BASE - level * INTERVAL_DECREMENT, INTERVAL_MIN);
-        var propInterval = Math.Max(PROP_INTERVAL_BASE - level * PROP_INTERVAL_DECREMENT, PROP_INTERVAL_MIN);
+        var propChance = Math.Min(PROP_CHANCE_BASE + level * PROP_CHANCE_INCREMENT, 0.65);
 
-        return (speed, gap, interval, propInterval);
+        return (speed, gap, interval, propChance);
     }
 
     /* ========== 水管生成 ========== */
 
     private void GeneratePipes(GameSession s)
     {
-        var (speed, gap, interval, _) = GetDifficulty(s);
+        var (speed, gap, interval, propChance) = GetDifficulty(s);
 
         s.PipeTimer--;
         if (s.PipeTimer > 0) return;
@@ -193,6 +190,13 @@ public class GameService
         var pipe = CreatePipe(s, gap, speed);
         s.Pipes.Add(pipe);
         s.PipeTimer = (int)interval;
+
+        /* 水管生成时概率附带道具——道具放在水管间隙中央，确保玩家通过水管时能自然获取 */
+        if (_rng.NextDouble() < propChance)
+        {
+            var prop = CreatePropForPipe(s, pipe, speed);
+            s.Props.Add(prop);
+        }
     }
 
     private PipeState CreatePipe(GameSession s, double gap, double speed)
@@ -299,80 +303,46 @@ public class GameService
         }
     }
 
-    /* ========== 道具生成 ========== */
+    /* ========== 道具生成（与水管绑定） ========== */
 
-    private void GenerateProps(GameSession s)
-    {
-        var (speed, _, _, propInterval) = GetDifficulty(s);
-
-        s.PropTimer--;
-        if (s.PropTimer > 0) return;
-
-        var prop = CreateProp(s, speed);
-        s.Props.Add(prop);
-
-        s.PropTimer = (int)(propInterval + _rng.NextDouble() * PROP_INTERVAL_RANDOM);
-    }
-
-    private PropState CreateProp(GameSession s, double pipeSpeed)
+    /// <summary>
+    /// 为指定水管创建道具，道具放在水管间隙的中央位置。
+    /// 道具与水管同速移动，因此始终保持在间隙内，玩家通过水管时自然能获取。
+    /// </summary>
+    private PropState CreatePropForPipe(GameSession s, PipeState pipe, double pipeSpeed)
     {
         var prop = new PropState
         {
             Type = PROP_TYPES[_rng.Next(PROP_TYPES.Length)],
-            X = s.ScreenWidth + 30,
+            X = pipe.X + PIPE_WIDTH / 2 - PROP_SIZE / 2,  /* 与水管 X 中心对齐 */
             Speed = pipeSpeed,
             AnimPhase = _rng.NextDouble() * Math.PI * 2,
         };
 
-        prop.Y = FindSafePropY(s, prop);
+        var availableH = s.ScreenHeight - GROUND_HEIGHT;
+        var hasTop = pipe.Type == 0 || pipe.Type == 1 || pipe.Type == 3;
+        var hasBottom = pipe.Type == 0 || pipe.Type == 2 || pipe.Type == 3;
+
+        if (hasTop && hasBottom)
+        {
+            /* 双管：放在间隙中央，限制在安全区域内 */
+            var gapCenter = pipe.GapY + pipe.Gap / 2;
+            prop.Y = Math.Clamp(gapCenter - PROP_SIZE / 2, 50.0, availableH - PROP_SIZE - 30.0);
+        }
+        else if (hasBottom)
+        {
+            /* 只有下管：放在下管上方，留出安全边距 */
+            var maxY = pipe.GapY - PROP_SAFE_MARGIN - PROP_SIZE;
+            prop.Y = Math.Clamp(maxY, 50.0, availableH - PROP_SIZE - 30.0);
+        }
+        else
+        {
+            /* 只有上管：放在上管下方，留出安全边距 */
+            var minY = pipe.GapY + PROP_SAFE_MARGIN;
+            prop.Y = Math.Clamp(minY, 50.0, availableH - PROP_SIZE - 30.0);
+        }
+
         return prop;
-    }
-
-    private double FindSafePropY(GameSession s, PropState prop)
-    {
-        var safeTop = 50.0;
-        var safeBottom = s.ScreenHeight - GROUND_HEIGHT - 30.0;
-
-        /* 找到距离道具最近的水管 */
-        PipeState? bestPipe = null;
-        var bestDist = double.MaxValue;
-
-        foreach (var pipe in s.Pipes)
-        {
-            var dist = Math.Abs(pipe.X - prop.X);
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                bestPipe = pipe;
-            }
-        }
-
-        if (bestPipe != null)
-        {
-            var hasTop = bestPipe.Type == 0 || bestPipe.Type == 1 || bestPipe.Type == 3;
-            var hasBottom = bestPipe.Type == 0 || bestPipe.Type == 2 || bestPipe.Type == 3;
-
-            if (hasTop && hasBottom)
-            {
-                /* 双管：放在间隙中央 */
-                var gapCenter = bestPipe.GapY + bestPipe.Gap / 2;
-                return Math.Clamp(gapCenter, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
-            }
-            else if (hasBottom)
-            {
-                /* 只有下管：放在下管上方 */
-                var maxY = bestPipe.GapY - PROP_SAFE_MARGIN;
-                return Math.Clamp(maxY, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
-            }
-            else if (hasTop)
-            {
-                /* 只有上管：放在上管下方 */
-                var minY = bestPipe.GapY + PROP_SAFE_MARGIN;
-                return Math.Clamp(minY, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
-            }
-        }
-
-        return (safeTop + safeBottom) / 2;
     }
 
     private void UpdateProps(GameSession s)
