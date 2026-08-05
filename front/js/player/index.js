@@ -65,14 +65,7 @@ export default class Player extends Animation {
   }
 
   initEvent() {
-    wx.onTouchStart(() => {
-      /* 只在游戏进行中响应触摸 */
-      if (GameGlobal.screenState !== 'playing') return;
-      if (GameGlobal.databus.isGameOver) return;
-      /* 跳跃 */
-      this.vy = JUMP_VELOCITY;
-      if (GameGlobal.sound) GameGlobal.sound.playWing();
-    });
+    /* 前后端分离版：触摸事件由 GameInfo 统一处理，不再在此注册 */
   }
 
   update() {

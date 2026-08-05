@@ -87,12 +87,26 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* ========== 游戏中渲染 ========== */
+  /* ========== 游戏中渲染（旧版兼容） ========== */
   render(ctx) {
     this.renderHUD(ctx);
 
-    if (GameGlobal.databus.isGameOver) {
+    if (GameGlobal.databus && GameGlobal.databus.isGameOver) {
       this.renderGameOver(ctx);
+    }
+  }
+
+  /* ========== 前后端分离版渲染 ========== */
+  renderServer(ctx, gameState) {
+    /* 使用数字图片显示分数 */
+    this._drawScore(ctx, gameState.score, SCREEN_WIDTH / 2, 40);
+
+    /* 道具状态栏 */
+    this.renderPropBarServer(ctx, gameState);
+
+    /* 游戏结束 */
+    if (gameState.isGameOver) {
+      this.renderGameOverServer(ctx, gameState);
     }
   }
 
@@ -137,6 +151,24 @@ export default class GameInfo extends Emitter {
     if (db.scoreMultiplier > 1) {
       ctx.fillStyle = '#FF5252';
       ctx.fillText(`x2 ${Math.ceil(db.multiplierTimer / 60)}s`, barX + 80, barY);
+    }
+  }
+
+  /* 服务端道具状态栏 */
+  renderPropBarServer(ctx, gameState) {
+    const barY = SCREEN_HEIGHT - 15;
+    const barX = SCREEN_WIDTH / 2 - 60;
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+
+    if (gameState.shieldActive) {
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(`护盾 ${Math.ceil(gameState.shieldTimer / 60)}s`, barX, barY);
+    }
+
+    if (gameState.scoreMultiplier > 1) {
+      ctx.fillStyle = '#FF5252';
+      ctx.fillText(`x2 ${Math.ceil(gameState.multiplierTimer / 60)}s`, barX + 80, barY);
     }
   }
 
@@ -185,6 +217,45 @@ export default class GameInfo extends Emitter {
     ctx.fillText('返回主页', SCREEN_WIDTH / 2, this.menuBtnArea.startY + 28);
   }
 
+  /* 服务端版游戏结束 */
+  renderGameOverServer(ctx, gameState) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    const score = gameState.score;
+
+    const goW = 192;
+    const goH = 42;
+    ctx.drawImage(this.gameoverImg, SCREEN_WIDTH / 2 - goW / 2, SCREEN_HEIGHT / 2 - 90, goW, goH);
+
+    this._drawScore(ctx, score, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30);
+
+    const best = this._getBestScore();
+    if (score >= best && score > 0) {
+      this._saveBestScore(score);
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('新纪录!', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
+    } else if (best > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
+    }
+
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillRect(this.btnArea.startX, this.btnArea.startY, 160, 40);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.fillText('重新开始', SCREEN_WIDTH / 2, this.btnArea.startY + 28);
+
+    ctx.fillStyle = '#2196F3';
+    ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('返回主页', SCREEN_WIDTH / 2, this.menuBtnArea.startY + 28);
+  }
+
   /* ========== 触摸事件 ========== */
   touchEventHandler(event) {
     const { clientX, clientY } = event.touches[0];
@@ -202,8 +273,36 @@ export default class GameInfo extends Emitter {
       return;
     }
 
+    /* 游戏中：点击屏幕任意位置 = 跳跃（前后端分离版） */
+    if (GameGlobal.screenState === 'playing') {
+      /* 使用后端API时，游戏结束状态通过 GameGlobal.isGameOverServer 传递 */
+      if (GameGlobal.isGameOverServer) {
+        /* 游戏结束，检查按钮点击 */
+        if (
+          clientX >= this.btnArea.startX &&
+          clientX <= this.btnArea.endX &&
+          clientY >= this.btnArea.startY &&
+          clientY <= this.btnArea.endY
+        ) {
+          this.emit('restart');
+          return;
+        }
+        if (
+          clientX >= this.menuBtnArea.startX &&
+          clientX <= this.menuBtnArea.endX &&
+          clientY >= this.menuBtnArea.startY &&
+          clientY <= this.menuBtnArea.endY
+        ) {
+          this.emit('backToHome');
+        }
+        return;
+      }
+      this.emit('flap');
+      return;
+    }
+
     /* 游戏结束：点击按钮 */
-    if (!GameGlobal.databus.isGameOver) return;
+    if (!GameGlobal.databus || !GameGlobal.databus.isGameOver) return;
 
     if (
       clientX >= this.btnArea.startX &&

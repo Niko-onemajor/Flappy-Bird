@@ -1,17 +1,12 @@
 import './render';
 import { SCREEN_WIDTH } from './render';
-import Player from './player/index';
-import Pipe from './npc/pipe';
-import Prop from './npc/prop';
+import { startGame, gameTick, gameFlap, submitScore } from './api';
 import BackGround from './runtime/background';
 import GameInfo from './runtime/gameinfo';
 import Sound from './sound';
-import DataBus from './databus';
-import { DIFFICULTY, PIPE, PROP as PROP_CFG } from './config';
 
 const ctx = canvas.getContext('2d');
 
-GameGlobal.databus = new DataBus();
 GameGlobal.sound = new Sound();
 
 const SCREEN_STATE = {
@@ -19,175 +14,121 @@ const SCREEN_STATE = {
   PLAYING: 'playing',
 };
 
-/* 全局屏幕状态，供 gameinfo 等模块读取 */
+/* 全局屏幕状态 */
 GameGlobal.screenState = SCREEN_STATE.HOME;
 
 /**
- * 横版点击跳跃小游戏主循环
+ * 前后端分离版主循环
+ * 前端仅负责渲染，游戏逻辑全部由后端 API 处理
  */
 export default class Main {
   aniId = 0;
   bg = new BackGround();
-  player = new Player();
   gameInfo = new GameInfo();
   screenState = SCREEN_STATE.HOME;
+  sessionId = null;
+  gameState = null;
 
-  /* 水管生成计时器 */
-  pipeTimer = 0;
-
-  /* 道具生成计时器 */
-  propTimer = 0;
+  /* 水管/道具图片缓存 */
+  pipeGreenImg = null;
+  pipeRedImg = null;
 
   constructor() {
+    this._loadImages();
     this.gameInfo.on('start', this.startGame.bind(this));
     this.gameInfo.on('restart', this.restartGame.bind(this));
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
+    this.gameInfo.on('flap', this.flap.bind(this));
     this.loop();
   }
 
-  /* 根据当前分数计算难度参数 */
-  getDifficulty() {
-    const db = GameGlobal.databus;
-    const level = Math.floor(db.score / DIFFICULTY.STEP);
-
-    return {
-      speed: Math.min(DIFFICULTY.SPEED_BASE + level * DIFFICULTY.SPEED_INCREMENT, DIFFICULTY.SPEED_MAX),
-      gap: Math.max(DIFFICULTY.GAP_BASE - level * DIFFICULTY.GAP_DECREMENT, DIFFICULTY.GAP_MIN),
-      interval: Math.max(DIFFICULTY.INTERVAL_BASE - level * DIFFICULTY.INTERVAL_DECREMENT, DIFFICULTY.INTERVAL_MIN),
-      propInterval: Math.max(PROP_CFG.INTERVAL_BASE - level * DIFFICULTY.PROP_INTERVAL_DECREMENT, PROP_CFG.INTERVAL_MIN),
-    };
+  _loadImages() {
+    this.pipeGreenImg = wx.createImage();
+    this.pipeGreenImg.src = 'images/pipe-green.png';
+    this.pipeRedImg = wx.createImage();
+    this.pipeRedImg.src = 'images/pipe-red.png';
   }
 
   /* 返回主页 */
   goToHome() {
     this.screenState = SCREEN_STATE.HOME;
     GameGlobal.screenState = SCREEN_STATE.HOME;
-    GameGlobal.databus.reset();
+    GameGlobal.isGameOverServer = false;
+    this.gameState = null;
+    this.sessionId = null;
+    this._scoreSubmitted = false;
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this.loop.bind(this));
   }
 
-  /* 开始游戏 */
-  startGame() {
-    GameGlobal.databus.reset();
-    this.player.init();
-    this.screenState = SCREEN_STATE.PLAYING;
-    GameGlobal.screenState = SCREEN_STATE.PLAYING;
-    this.pipeTimer = 0;
-    this.propTimer = 0;
-    GameGlobal.sound.playBgm();
-    cancelAnimationFrame(this.aniId);
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
+  /* 开始游戏（调用后端 API） */
+  async startGame() {
+    try {
+      const state = await startGame(SCREEN_WIDTH, canvas.height);
+      this.sessionId = state.sessionId;
+      this.gameState = state;
+      this._scoreSubmitted = false;
+      this._playedDieSound = false;
+      GameGlobal.isGameOverServer = false;
+      this.screenState = SCREEN_STATE.PLAYING;
+      GameGlobal.screenState = SCREEN_STATE.PLAYING;
+      GameGlobal.sound.playBgm();
+      cancelAnimationFrame(this.aniId);
+      this.aniId = requestAnimationFrame(this.loop.bind(this));
+    } catch (err) {
+      console.error('[Main] 启动游戏失败:', err);
+    }
   }
 
   /* 重新开始 */
-  restartGame() {
-    this.startGame();
+  async restartGame() {
+    await this.startGame();
   }
 
-  /* 生成水管：计时器 + 直接检查上一对水管实际位置 */
-  pipeGenerate() {
-    const diff = this.getDifficulty();
-
-    this.pipeTimer--;
-    if (this.pipeTimer > 0) return;
-
-    /* 检查上一对水管是否已走远，防止两对水管挤在一起导致卡死 */
-    const pipes = GameGlobal.databus.pipes;
-    if (pipes.length > 0) {
-      const lastPipe = pipes[pipes.length - 1];
-      if (lastPipe.x > SCREEN_WIDTH - PIPE.MIN_SPACING) {
-        return; /* 上一对还没走远，等下一帧 */
-      }
+  /* 小鸟跳跃（调用后端 API） */
+  async flap() {
+    if (!this.sessionId || !this.gameState || this.gameState.isGameOver) return;
+    try {
+      const prevScore = this.gameState.score;
+      this.gameState = await gameFlap(this.sessionId);
+      GameGlobal.sound.playWing();
+    } catch (err) {
+      console.error('[Main] 跳跃请求失败:', err);
     }
-
-    const pipe = GameGlobal.databus.pool.getItemByClass('pipe', Pipe);
-    pipe.init(diff.gap, diff.speed);
-    GameGlobal.databus.pipes.push(pipe);
-
-    this.pipeTimer = diff.interval;
   }
 
-  /* 生成道具：匹配最近水管间隙中心，与水管同速移动 */
-  propGenerate() {
-    const diff = this.getDifficulty();
-
-    this.propTimer--;
-    if (this.propTimer > 0) return;
-
-    const prop = GameGlobal.databus.pool.getItemByClass('prop', Prop);
-    prop.init(null, GameGlobal.databus.pipes, diff.speed);
-    GameGlobal.databus.props.push(prop);
-
-    this.propTimer = diff.propInterval + Math.floor(Math.random() * PROP_CFG.INTERVAL_RANDOM);
-  }
-
-  /* 碰撞检测 */
-  collisionDetection() {
-    const db = GameGlobal.databus;
-    const player = this.player;
-
-    for (let i = 0; i < db.pipes.length; i++) {
-      const pipe = db.pipes[i];
-
-      if (pipe.isCollideWithBird(player)) {
-        if (db.shieldActive) {
-          db.pipes.splice(i, 1);
-          i--;
-          continue;
-        }
-        player.destroy();
-        db.gameOver();
+  /* 推进帧（调用后端 API） */
+  async tick() {
+    if (!this.sessionId || !this.gameState) return;
+    if (this.gameState.isGameOver) return;
+    try {
+      const prevScore = this.gameState.score;
+      this.gameState = await gameTick(this.sessionId);
+      /* 同步游戏结束状态到全局 */
+      GameGlobal.isGameOverServer = this.gameState.isGameOver;
+      /* 得分时播放音效 */
+      if (this.gameState.score > prevScore) {
+        GameGlobal.sound.playPoint();
+      }
+      /* 游戏结束时播放音效 */
+      if (this.gameState.isGameOver && !this._playedDieSound) {
+        this._playedDieSound = true;
         GameGlobal.sound.playHit();
         GameGlobal.sound.playDie();
-        break;
       }
-
-      /* 通过水管，计分 */
-      if (!pipe.scored && pipe.x + pipe.width < player.x) {
-        pipe.scored = true;
-        db.score += db.scoreMultiplier;
-        GameGlobal.sound.playPoint();
-      }
-    }
-
-    /* 道具碰撞 */
-    for (let i = 0; i < db.props.length; i++) {
-      const prop = db.props[i];
-      if (prop.isCollideWith(player) && !prop.collected) {
-        prop.collect();
-        GameGlobal.sound.playPoint();
-      }
+    } catch (err) {
+      console.error('[Main] Tick 请求失败:', err);
     }
   }
 
-  /* 更新所有实体 */
-  update() {
-    if (this.screenState !== SCREEN_STATE.PLAYING) return;
-    if (GameGlobal.databus.isGameOver) return;
-
-    GameGlobal.databus.frame++;
-    this.bg.update();
-    this.player.update();
-    this.pipeGenerate();
-    this.propGenerate();
-    GameGlobal.databus.pipes.forEach((p) => p.update());
-    GameGlobal.databus.props.forEach((p) => p.update());
-    this.collisionDetection();
-    this.updatePropTimers();
-  }
-
-  /* 更新道具剩余时间 */
-  updatePropTimers() {
-    const db = GameGlobal.databus;
-    if (db.shieldActive) {
-      db.shieldTimer--;
-      if (db.shieldTimer <= 0) db.shieldActive = false;
-    }
-    if (db.scoreMultiplier > 1) {
-      db.multiplierTimer--;
-      if (db.multiplierTimer <= 0) db.scoreMultiplier = 1;
+  /* 提交分数 */
+  async submitScoreToServer() {
+    if (!this.gameState || this.gameState.score <= 0) return;
+    try {
+      await submitScore('Player', this.gameState.score);
+    } catch (err) {
+      console.error('[Main] 提交分数失败:', err);
     }
   }
 
@@ -200,20 +141,192 @@ export default class Main {
       this.gameInfo.renderHome(ctx);
     } else {
       this.bg.render(ctx);
-      GameGlobal.databus.pipes.forEach((p) => p.render(ctx));
-      GameGlobal.databus.props.forEach((p) => p.render(ctx));
-      this.player.render(ctx);
-      this.gameInfo.render(ctx);
+      if (this.gameState) {
+        /* 渲染水管 */
+        if (this.gameState.pipes) {
+          this.gameState.pipes.forEach((p) => this._renderPipe(ctx, p));
+        }
+        /* 渲染道具 */
+        if (this.gameState.props) {
+          this.gameState.props.forEach((p) => this._renderProp(ctx, p));
+        }
+        /* 渲染小鸟 */
+        if (this.gameState.player) {
+          this._renderPlayer(ctx);
+        }
+        /* 渲染 HUD */
+        this.gameInfo.renderServer(ctx, this.gameState);
+      }
+    }
+  }
+
+  /* 绘制水管 */
+  _renderPipe(ctx, pipe) {
+    const PIPE_WIDTH = 52;
+    const GROUND_HEIGHT = 90;
+    const availableH = canvas.height - GROUND_HEIGHT;
+    const img = pipe.isMoving ? this.pipeRedImg : this.pipeGreenImg;
+
+    const hasTop = pipe.type === 0 || pipe.type === 1 || pipe.type === 3;
+    const hasBottom = pipe.type === 0 || pipe.type === 2 || pipe.type === 3;
+
+    if (hasTop) {
+      ctx.save();
+      ctx.translate(pipe.x + PIPE_WIDTH / 2, pipe.gapY);
+      ctx.scale(1, -1);
+      ctx.drawImage(img, -PIPE_WIDTH / 2, 0, PIPE_WIDTH, pipe.gapY);
+      ctx.restore();
     }
 
-    GameGlobal.databus.animations.forEach((ani) => {
-      if (ani.isPlaying) ani.aniRender(ctx);
-    });
+    if (hasBottom) {
+      const bottomY = pipe.gapY + (hasTop ? pipe.gap : 0);
+      const bottomH = availableH - bottomY;
+      if (bottomH > 0) {
+        ctx.drawImage(img, pipe.x, bottomY, PIPE_WIDTH, bottomH);
+      }
+    }
+  }
+
+  /* 绘制道具 */
+  _renderProp(ctx, prop) {
+    const PROP_SIZE = 32;
+    const FLOAT_AMP = 4;
+    const cx = prop.x + PROP_SIZE / 2;
+    const cy = prop.y + PROP_SIZE / 2 + Math.sin(prop.animPhase || 0) * FLOAT_AMP;
+    const r = PROP_SIZE / 2;
+
+    const style = prop.type === 'multiplier'
+      ? { color: '#FF5252', glow: '#D32F2F', icon: 'x2', name: '双倍' }
+      : { color: '#FFD700', glow: '#FFA000', icon: '\uD83D\uDEE1', name: '护盾' };
+
+    ctx.save();
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = 12;
+
+    /* 外圈 */
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* 主体 */
+    const grad = ctx.createRadialGradient(cx - 3, cy - 3, r * 0.1, cx, cy, r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.4, style.color);
+    grad.addColorStop(1, style.glow);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* 边框 */
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    /* 图标 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(style.icon, cx, cy);
+
+    ctx.restore();
+  }
+
+  /* 绘制小鸟 */
+  _renderPlayer(ctx) {
+    const p = this.gameState.player;
+    if (!p.visible || !p.isActive) return;
+
+    const PLAYER_WIDTH = 34;
+    const PLAYER_HEIGHT = 24;
+    const SHIELD_RADIUS = 28;
+
+    const cx = p.x + PLAYER_WIDTH / 2;
+    const cy = p.y + PLAYER_HEIGHT / 2;
+
+    /* 护盾特效 */
+    if (this.gameState.shieldActive) {
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, SHIELD_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    /* 小鸟本体 */
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((p.rotation * Math.PI) / 180);
+
+    const BIRD_COLORS = ['redbird', 'bluebird', 'yellowbird'];
+    const color = BIRD_COLORS[Math.floor(Math.random() * BIRD_COLORS.length)];
+    const frames = ['downflap', 'midflap', 'upflap'];
+    if (!this._birdFrames) {
+      this._birdFrames = {};
+      BIRD_COLORS.forEach((c) => {
+        this._birdFrames[c] = frames.map((f) => {
+          const img = wx.createImage();
+          img.src = `images/${c}-${f}.png`;
+          return img;
+        });
+      });
+    }
+
+    const frameImg = this._birdFrames[color][p.flapIndex || 0];
+    if (frameImg) {
+      ctx.drawImage(frameImg, -PLAYER_WIDTH / 2, -PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
+    }
+
+    ctx.restore();
+
+    /* Buff 图标 */
+    if (this.gameState.shieldActive) {
+      ctx.save();
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('\uD83D\uDEE1', cx + 18, cy - 18);
+      ctx.fillText('\uD83D\uDEE1', cx + 18, cy - 18);
+      ctx.restore();
+    }
+    if (this.gameState.scoreMultiplier > 1) {
+      ctx.save();
+      ctx.fillStyle = '#FF5252';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('x2', cx + 18, cy - 5);
+      ctx.fillText('x2', cx + 18, cy - 5);
+      ctx.restore();
+    }
   }
 
   /* 主循环 */
   loop() {
-    this.update();
+    if (this.screenState === SCREEN_STATE.PLAYING) {
+      this.tick();
+      /* 游戏结束时提交分数 */
+      if (this.gameState && this.gameState.isGameOver && !this._scoreSubmitted) {
+        this._scoreSubmitted = true;
+        this.submitScoreToServer();
+      }
+    }
+
     this.render();
     this.aniId = requestAnimationFrame(this.loop.bind(this));
   }

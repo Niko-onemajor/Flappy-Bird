@@ -38,7 +38,7 @@ export default class BackGround {
   }
 
   update() {
-    if (GameGlobal.databus.isGameOver) return;
+    if (GameGlobal.isGameOverServer || (GameGlobal.databus && GameGlobal.databus.isGameOver)) return;
 
     /* 地面滚动（快） */
     this.baseX = (this.baseX + GROUND.SPEED) % GROUND.IMG_WIDTH;
