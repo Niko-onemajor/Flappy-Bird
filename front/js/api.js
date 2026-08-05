@@ -1,5 +1,13 @@
-/* API 基础配置 */
-const API_BASE = 'http://localhost:5205';
+/* API 基础配置
+ * ─────────────────────────────────────────────
+ * 模拟器调试：使用 localhost（默认）
+ * 真机调试：  改为电脑的局域网 IP，如 http://192.168.1.100:5205
+ *            手机和电脑必须在同一 WiFi 下
+ *            查看电脑 IP：命令行输入 ipconfig，找 IPv4 地址
+ * ───────────────────────────────────────────── */
+const DEV_IP = 'localhost';  // 真机调试时改为你的电脑IP
+const API_PORT = 5205;
+const API_BASE = `http://${DEV_IP}:${API_PORT}`;
 
 /**
  * 封装 wx.request 为 Promise
