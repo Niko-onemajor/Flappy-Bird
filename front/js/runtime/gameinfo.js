@@ -255,6 +255,20 @@ export default class GameInfo extends Emitter {
     ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 55);
   }
 
+  /* ========== 本地版渲染 ========== */
+  renderLocal(ctx, databus) {
+    /* 使用数字图片显示分数 */
+    this._drawScore(ctx, databus.score, SCREEN_WIDTH / 2, 40);
+
+    /* 道具状态栏 */
+    this.renderPropBar(ctx, databus);
+
+    /* 游戏结束 */
+    if (databus.isGameOver) {
+      this.renderGameOver(ctx);
+    }
+  }
+
   /* ========== 前后端分离版渲染 ========== */
   renderServer(ctx, gameState) {
     /* 使用数字图片显示分数 */
@@ -486,8 +500,10 @@ export default class GameInfo extends Emitter {
 
     /* 游戏中 / 准备中：点击屏幕任意位置 = 跳跃 */
     if (GameGlobal.screenState === 'playing' || GameGlobal.screenState === 'ready') {
-      /* 使用后端API时，游戏结束状态通过 GameGlobal.isGameOverServer 传递 */
-      if (GameGlobal.isGameOverServer) {
+      /* 本地或服务端游戏结束状态 */
+      const isOver = GameGlobal.isGameOverServer
+        || (GameGlobal.databus && GameGlobal.databus.isGameOver);
+      if (isOver) {
         /* 游戏结束，检查按钮点击 */
         if (
           clientX >= this.btnArea.startX &&
