@@ -69,6 +69,10 @@ export default class Main {
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
     this.gameInfo.on('flap', this.flap.bind(this));
     this.gameInfo.on('showLeaderboard', this.showLeaderboard.bind(this));
+
+    /* 初始化全局屏幕状态（必须在注册触摸事件后、loop 前设置） */
+    GameGlobal.screenState = SCREEN_STATE.HOME;
+    console.log('[Main] 初始化完成，屏幕状态:', GameGlobal.screenState);
     this.loop();
   }
 

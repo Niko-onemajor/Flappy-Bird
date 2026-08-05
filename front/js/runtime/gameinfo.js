@@ -460,16 +460,22 @@ export default class GameInfo extends Emitter {
 
   /* ========== 触摸事件 ========== */
   touchEventHandler(event) {
+    if (!event.touches || event.touches.length === 0) return;
     const { clientX, clientY } = event.touches[0];
+    console.log('[Touch] screenState:', GameGlobal.screenState, 'pos:', clientX, clientY);
 
     /* 主页：点击开始按钮 */
     if (GameGlobal.screenState === 'home') {
+      console.log('[Touch] 主页触摸:', clientX, clientY,
+        '开始按钮:', this.homeBtnArea.startX, this.homeBtnArea.startY,
+        '排行按钮:', this.leaderboardBtnArea.startX, this.leaderboardBtnArea.startY);
       if (
         clientX >= this.homeBtnArea.startX &&
         clientX <= this.homeBtnArea.endX &&
         clientY >= this.homeBtnArea.startY &&
         clientY <= this.homeBtnArea.endY
       ) {
+        console.log('[Touch] → 点击开始游戏');
         this.emit('start');
         return;
       }
@@ -479,6 +485,7 @@ export default class GameInfo extends Emitter {
         clientY >= this.leaderboardBtnArea.startY &&
         clientY <= this.leaderboardBtnArea.endY
       ) {
+        console.log('[Touch] → 点击排行榜');
         this.emit('showLeaderboard');
         return;
       }
