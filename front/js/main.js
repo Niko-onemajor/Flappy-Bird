@@ -138,6 +138,7 @@ export default class Main {
   async showLeaderboard() {
     this.screenState = SCREEN_STATE.LEADERBOARD;
     GameGlobal.screenState = SCREEN_STATE.LEADERBOARD;
+    this.gameInfo._leaderboardScrollY = 0;
     try {
       const data = await getTopScores(10);
       this.gameInfo._leaderboardData = data;

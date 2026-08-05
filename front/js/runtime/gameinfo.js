@@ -32,6 +32,9 @@ export default class GameInfo extends Emitter {
 
     /* 排行榜数据 */
     this._leaderboardData = null;
+    this._leaderboardScrollY = 0;    /* 排行榜滚动偏移 */
+    this._leaderboardMaxScroll = 0;  /* 排行榜最大滚动量 */
+    this._lastTouchY = 0;            /* 上一次触摸Y坐标（用于滑动） */
 
     /* 游戏结束按钮 */
     this.btnArea = {
@@ -63,6 +66,8 @@ export default class GameInfo extends Emitter {
 
     this._touchHandler = this.touchEventHandler.bind(this);
     wx.onTouchStart(this._touchHandler);
+    this._touchMoveHandler = this.touchMoveHandler.bind(this);
+    wx.onTouchMove(this._touchMoveHandler);
   }
 
   /* ========== 主页渲染 ========== */
@@ -125,6 +130,12 @@ export default class GameInfo extends Emitter {
 
   /* ========== 排行榜渲染 ========== */
   renderLeaderboard(ctx) {
+    const tableTop = 80;
+    const rowH = 36;
+    const headerH = 40;
+    const listTop = tableTop + headerH;
+    const listBottom = SCREEN_HEIGHT - 20;
+
     /* 半透明背景 */
     ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -133,7 +144,7 @@ export default class GameInfo extends Emitter {
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('排行榜', SCREEN_WIDTH / 2, 50);
+    ctx.fillText('排行榜', SCREEN_WIDTH / 2, 40);
 
     /* 返回按钮 */
     const backBtn = this.backBtnArea;
@@ -157,36 +168,48 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 表头 */
-    const tableTop = 90;
-    const rowH = 36;
+    /* 表头（固定） */
     ctx.font = 'bold 14px Arial';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('排名', 50, tableTop);
-    ctx.fillText('玩家', 120, tableTop);
-    ctx.fillText('分数', 240, tableTop);
-    ctx.fillText('时间', 320, tableTop);
+    ctx.textAlign = 'left';
+    ctx.fillText('排名', 50, tableTop + 12);
+    ctx.fillText('玩家', 120, tableTop + 12);
+    ctx.fillText('分数', 240, tableTop + 12);
+    ctx.fillText('时间', 320, tableTop + 12);
 
     /* 分割线 */
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(20, tableTop + 10);
-    ctx.lineTo(SCREEN_WIDTH - 20, tableTop + 10);
+    ctx.moveTo(20, tableTop + headerH - 10);
+    ctx.lineTo(SCREEN_WIDTH - 20, tableTop + headerH - 10);
     ctx.stroke();
+
+    /* 计算最大滚动量 */
+    const listHeight = listBottom - listTop;
+    this._leaderboardMaxScroll = Math.max(0, data.length * rowH - listHeight);
+
+    /* 裁剪滚动区域 */
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, listTop, SCREEN_WIDTH, listHeight);
+    ctx.clip();
 
     /* 排行数据 */
     const medals = ['🥇', '🥈', '🥉'];
-    const maxShow = Math.min(data.length, 10);
+    const scrollY = -this._leaderboardScrollY;
 
-    for (let i = 0; i < maxShow; i++) {
+    for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const y = tableTop + 30 + i * rowH;
+      const y = listTop + scrollY + i * rowH;
+
+      /* 跳过可视区域外的行 */
+      if (y + rowH < listTop || y > listBottom) continue;
 
       /* 交替行背景 */
       if (i % 2 === 0) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.fillRect(20, y - 10, SCREEN_WIDTH - 40, rowH - 4);
+        ctx.fillRect(20, y, SCREEN_WIDTH - 40, rowH - 4);
       }
 
       ctx.font = '14px Arial';
@@ -195,23 +218,41 @@ export default class GameInfo extends Emitter {
       /* 排名 */
       const rank = i < 3 ? medals[i] : `${i + 1}`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(rank, 50, y);
+      ctx.fillText(rank, 50, y + 12);
 
       /* 玩家名 */
       const name = row.playerName.length > 8 ? row.playerName.substring(0, 8) + '..' : row.playerName;
-      ctx.fillText(name, 100, y);
+      ctx.fillText(name, 100, y + 12);
 
       /* 分数 */
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(row.score), 240, y);
+      ctx.fillText(String(row.score), 240, y + 12);
 
       /* 时间 */
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '11px Arial';
       const d = new Date(row.createdAt);
       const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      ctx.fillText(timeStr, 300, y);
+      ctx.fillText(timeStr, 300, y + 12);
+    }
+
+    ctx.restore();
+
+    /* 滚动条指示器 */
+    if (this._leaderboardMaxScroll > 0) {
+      const barH = listHeight * (listHeight / (data.length * rowH));
+      const barY = listTop + (this._leaderboardScrollY / this._leaderboardMaxScroll) * (listHeight - barH);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillRect(SCREEN_WIDTH - 6, barY, 4, Math.max(barH, 20));
+    }
+
+    /* 底部提示 */
+    if (this._leaderboardMaxScroll > 0 && this._leaderboardScrollY < this._leaderboardMaxScroll - 2) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = '11px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('↑ 上下滑动查看更多 ↑', SCREEN_WIDTH / 2, SCREEN_HEIGHT - 6);
     }
   }
 
@@ -492,8 +533,10 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 排行榜：点击返回按钮 */
+    /* 排行榜：记录起始触摸位置用于滚动 */
     if (GameGlobal.screenState === 'leaderboard') {
+      this._lastTouchY = clientY;
+      this._leaderboardScrollStartY = this._leaderboardScrollY;
       if (
         clientX >= this.backBtnArea.startX &&
         clientX <= this.backBtnArea.endX &&
@@ -556,6 +599,20 @@ export default class GameInfo extends Emitter {
     ) {
       this.emit('backToHome');
     }
+  }
+
+  /* ========== 触摸滑动（排行榜滚动） ========== */
+  touchMoveHandler(event) {
+    if (GameGlobal.screenState !== 'leaderboard') return;
+    if (!event.touches || event.touches.length === 0) return;
+    if (this._leaderboardMaxScroll <= 0) return;
+
+    const { clientY } = event.touches[0];
+    const delta = this._lastTouchY - clientY;
+    this._lastTouchY = clientY;
+
+    this._leaderboardScrollY += delta;
+    this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
   }
 
   /* ========== 辅助方法 ========== */
