@@ -1,0 +1,16 @@
+# .NET
+back/back/bin/
+back/back/obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
