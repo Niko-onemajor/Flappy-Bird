@@ -11,6 +11,7 @@ GameGlobal.sound = new Sound();
 
 const SCREEN_STATE = {
   HOME: 'home',
+  READY: 'ready',
   PLAYING: 'playing',
 };
 
@@ -35,11 +36,17 @@ export default class Main {
 
   constructor() {
     this._loadImages();
+    this._pickBirdColor();
     this.gameInfo.on('start', this.startGame.bind(this));
     this.gameInfo.on('restart', this.restartGame.bind(this));
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
     this.gameInfo.on('flap', this.flap.bind(this));
     this.loop();
+  }
+
+  _pickBirdColor() {
+    const BIRD_COLORS = ['redbird', 'bluebird', 'yellowbird'];
+    this._birdColor = BIRD_COLORS[Math.floor(Math.random() * BIRD_COLORS.length)];
   }
 
   _loadImages() {
@@ -71,8 +78,8 @@ export default class Main {
       this._scoreSubmitted = false;
       this._playedDieSound = false;
       GameGlobal.isGameOverServer = false;
-      this.screenState = SCREEN_STATE.PLAYING;
-      GameGlobal.screenState = SCREEN_STATE.PLAYING;
+      this.screenState = SCREEN_STATE.READY;
+      GameGlobal.screenState = SCREEN_STATE.READY;
       GameGlobal.sound.playBgm();
       cancelAnimationFrame(this.aniId);
       this.aniId = requestAnimationFrame(this.loop.bind(this));
@@ -89,8 +96,15 @@ export default class Main {
   /* 小鸟跳跃（调用后端 API） */
   async flap() {
     if (!this.sessionId || !this.gameState || this.gameState.isGameOver) return;
+
+    /* 准备状态：第一次点击开始游戏 */
+    if (this.screenState === SCREEN_STATE.READY) {
+      this.screenState = SCREEN_STATE.PLAYING;
+      GameGlobal.screenState = SCREEN_STATE.PLAYING;
+      return;
+    }
+
     try {
-      const prevScore = this.gameState.score;
       this.gameState = await gameFlap(this.sessionId);
       GameGlobal.sound.playWing();
     } catch (err) {
@@ -139,6 +153,20 @@ export default class Main {
     if (this.screenState === SCREEN_STATE.HOME) {
       this.bg.render(ctx);
       this.gameInfo.renderHome(ctx);
+    } else if (this.screenState === SCREEN_STATE.READY) {
+      this.bg.render(ctx);
+      if (this.gameState) {
+        if (this.gameState.pipes) {
+          this.gameState.pipes.forEach((p) => this._renderPipe(ctx, p));
+        }
+        if (this.gameState.props) {
+          this.gameState.props.forEach((p) => this._renderProp(ctx, p));
+        }
+        if (this.gameState.player) {
+          this._renderPlayer(ctx);
+        }
+      }
+      this.gameInfo.renderReady(ctx);
     } else {
       this.bg.render(ctx);
       if (this.gameState) {
@@ -268,21 +296,19 @@ export default class Main {
     ctx.translate(cx, cy);
     ctx.rotate((p.rotation * Math.PI) / 180);
 
-    const BIRD_COLORS = ['redbird', 'bluebird', 'yellowbird'];
-    const color = BIRD_COLORS[Math.floor(Math.random() * BIRD_COLORS.length)];
     const frames = ['downflap', 'midflap', 'upflap'];
     if (!this._birdFrames) {
       this._birdFrames = {};
-      BIRD_COLORS.forEach((c) => {
-        this._birdFrames[c] = frames.map((f) => {
-          const img = wx.createImage();
-          img.src = `images/${c}-${f}.png`;
-          return img;
-        });
+    }
+    if (!this._birdFrames[this._birdColor]) {
+      this._birdFrames[this._birdColor] = frames.map((f) => {
+        const img = wx.createImage();
+        img.src = `images/${this._birdColor}-${f}.png`;
+        return img;
       });
     }
 
-    const frameImg = this._birdFrames[color][p.flapIndex || 0];
+    const frameImg = this._birdFrames[this._birdColor][p.flapIndex || 0];
     if (frameImg) {
       ctx.drawImage(frameImg, -PLAYER_WIDTH / 2, -PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
     }

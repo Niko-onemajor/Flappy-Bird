@@ -1,0 +1,273 @@
+{
+  "info": {
+    "name": "Flappy Bird API 自动化测试",
+    "description": "Flappy Bird 后端游戏接口测试集合。包含游戏生命周期和排行榜的完整测试流程。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5205"
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 开始游戏",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "pm.test('返回 sessionId', () => {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.sessionId).to.be.a('string').and.not.empty;",
+              "    pm.collectionVariables.set('sessionId', json.sessionId);",
+              "});",
+              "pm.test('小鸟初始状态正确', () => {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.player.isActive).to.be.true;",
+              "    pm.expect(json.score).to.equal(0);",
+              "    pm.expect(json.isGameOver).to.be.false;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"screenWidth\": 375,\n  \"screenHeight\": 667\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/game/start",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "game", "start"]
+        }
+      }
+    },
+    {
+      "name": "2. 小鸟跳跃",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('sessionId 匹配', () => pm.expect(json.sessionId).to.equal(pm.collectionVariables.get('sessionId')));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/game/{{sessionId}}/flap",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "game", "{{sessionId}}", "flap"]
+        }
+      }
+    },
+    {
+      "name": "3. 推进帧（连续5次）",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('帧数递增', () => pm.expect(json.frame).to.be.above(0));",
+              "pm.test('玩家位置变化', () => pm.expect(json.player.y).to.not.equal(333.5));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "game", "{{sessionId}}", "tick"]
+        }
+      }
+    },
+    {
+      "name": "4. 获取游戏状态",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('状态包含所有必要字段', () => {",
+              "    pm.expect(json).to.have.property('sessionId');",
+              "    pm.expect(json).to.have.property('player');",
+              "    pm.expect(json).to.have.property('pipes');",
+              "    pm.expect(json).to.have.property('props');",
+              "    pm.expect(json).to.have.property('score');",
+              "    pm.expect(json).to.have.property('isGameOver');",
+              "    pm.expect(json).to.have.property('frame');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/game/{{sessionId}}/state",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "game", "{{sessionId}}", "state"]
+        }
+      }
+    },
+    {
+      "name": "5. 查询排行榜",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "pm.test('返回数组', () => pm.expect(pm.response.json()).to.be.an('array'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/score?limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "score"],
+          "query": [{ "key": "limit", "value": "10" }]
+        }
+      }
+    },
+    {
+      "name": "6. 提交分数",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('返回包含 id', () => pm.expect(json.id).to.be.a('number'));",
+              "pm.test('分数正确', () => pm.expect(json.score).to.equal(42));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"playerName\": \"TestPlayer\",\n  \"score\": 42\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/score",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "score"]
+        }
+      }
+    },
+    {
+      "name": "【完整流程】开始→跳跃→推进→结束",
+      "item": [
+        {
+          "name": "Step 1: 开始游戏",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('sessionId', json.sessionId);",
+                  "console.log('Session:', json.sessionId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"screenWidth\":375,\"screenHeight\":667}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/game/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "start"]
+            }
+          }
+        },
+        {
+          "name": "Step 2: 跳跃",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('跳跃成功', () => pm.expect(json.isGameOver).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/flap",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "flap"]
+            }
+          }
+        },
+        {
+          "name": "Step 3: 推进 5 帧",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('帧数 >= 5', () => pm.expect(json.frame).to.be.at.least(5));",
+                  "console.log('Score:', json.score, 'Frame:', json.frame, 'Pipes:', json.pipes.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

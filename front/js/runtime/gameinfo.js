@@ -96,6 +96,37 @@ export default class GameInfo extends Emitter {
     }
   }
 
+  /* ========== 新手引导（准备状态） ========== */
+  renderReady(ctx) {
+    /* 半透明遮罩 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 提示文字 */
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const cx = SCREEN_WIDTH / 2;
+    const cy = SCREEN_HEIGHT / 2 - 30;
+
+    ctx.strokeText('点击屏幕让小鸟飞起来', cx, cy - 20);
+    ctx.fillText('点击屏幕让小鸟飞起来', cx, cy - 20);
+
+    ctx.font = '14px Arial';
+    ctx.strokeText('躲避水管，飞得越远分数越高！', cx, cy + 15);
+    ctx.fillText('躲避水管，飞得越远分数越高！', cx, cy + 15);
+
+    /* 闪烁的"点击开始" */
+    const alpha = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+    ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 55);
+  }
+
   /* ========== 前后端分离版渲染 ========== */
   renderServer(ctx, gameState) {
     /* 使用数字图片显示分数 */
@@ -273,8 +304,8 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 游戏中：点击屏幕任意位置 = 跳跃（前后端分离版） */
-    if (GameGlobal.screenState === 'playing') {
+    /* 游戏中 / 准备中：点击屏幕任意位置 = 跳跃 */
+    if (GameGlobal.screenState === 'playing' || GameGlobal.screenState === 'ready') {
       /* 使用后端API时，游戏结束状态通过 GameGlobal.isGameOverServer 传递 */
       if (GameGlobal.isGameOverServer) {
         /* 游戏结束，检查按钮点击 */

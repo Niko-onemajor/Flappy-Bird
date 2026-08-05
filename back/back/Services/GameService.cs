@@ -354,16 +354,21 @@ public class GameService
 
             if (hasTop && hasBottom)
             {
+                /* 双管：放在间隙中央 */
                 var gapCenter = bestPipe.GapY + bestPipe.Gap / 2;
-                return Math.Max(safeTop + PROP_SIZE, Math.Min(gapCenter, safeBottom - PROP_SIZE));
+                return Math.Clamp(gapCenter, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
             }
             else if (hasBottom)
             {
-                return Math.Max(safeTop + PROP_SIZE, bestPipe.GapY - PROP_SAFE_MARGIN - PROP_SIZE);
+                /* 只有下管：放在下管上方 */
+                var maxY = bestPipe.GapY - PROP_SAFE_MARGIN;
+                return Math.Clamp(maxY, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
             }
             else if (hasTop)
             {
-                return Math.Min(safeBottom - PROP_SIZE, bestPipe.GapY + PROP_SAFE_MARGIN + PROP_SIZE);
+                /* 只有上管：放在上管下方 */
+                var minY = bestPipe.GapY + PROP_SAFE_MARGIN;
+                return Math.Clamp(minY, safeTop + PROP_SIZE, safeBottom - PROP_SIZE);
             }
         }
 
