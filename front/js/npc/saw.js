@@ -23,8 +23,8 @@ export default class Saw extends Sprite {
     this.rotation = Math.random() * Math.PI * 2;
     this._hostPipe = pipe;
 
-    /* 水平位置：从屏幕右侧进入（参考水管机制），给玩家反应时间 */
-    this.x = SCREEN_WIDTH + 40 + Math.random() * 80;
+    /* 水平位置：从屏幕右侧更远处进入，留出足够反应时间 */
+    this.x = SCREEN_WIDTH + 180 + Math.random() * 120;
 
     /* 垂直位置：放在水管间隙上方或下方，不堵死玩家通路 */
     this.y = this._calcSawY(pipe);
