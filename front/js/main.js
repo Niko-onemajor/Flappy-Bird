@@ -539,6 +539,9 @@ export default class Main {
       if (this._isPropCollideWithPlayer(prop)) {
         if (prop.type === 'shield' && this.databus.shieldCooldown > 0) continue;
         prop.collect();
+        /* 从数组中移除，释放位置给新道具 */
+        this.databus.props.splice(i, 1);
+        this.databus.pool.recover('prop', prop);
         /* 道具拾取音效 */
         if (prop.type === 'shield') {
           GameGlobal.sound.playShieldPickup();
