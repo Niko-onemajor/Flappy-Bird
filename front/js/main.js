@@ -39,6 +39,7 @@ const INTERVAL_MIN = 30;
 const INTERVAL_DECREMENT = 2;
 const PROP_CHANCE_BASE = 0.35;
 const PROP_CHANCE_INCREMENT = 0.03;
+const PROP_COOLDOWN_MIN = 120;  /* 道具最小间隔帧数（2秒），防止扎堆 */
 
 const PIPE_WIDTH = PIPE.WIDTH;
 const PROP_SIZE = PROP_CFG.SIZE;
@@ -66,12 +67,13 @@ export default class Main {
   databus = GameGlobal.databus;
 
   pipeTimer = 0;
-  propTimer = 0;
+  propTimer = 0;            /* 道具生成冷却计时器 */
+  _lastPropScore = 0;       /* 上次生成道具时的分数 */
   _scoreSubmitted = false;
   _playedDieSound = false;
   _prevScore = 0;
-  _countdownTimer = 0;       /* 暂停恢复倒计时 */
-  _countdownStart = 0;       /* 倒计时开始帧 */
+  _countdownTimer = 0;
+  _countdownStart = 0;
 
   constructor() {
     this.player = new Player();
@@ -84,10 +86,8 @@ export default class Main {
     this.gameInfo.on('resume', this.resumeGame.bind(this));
     this.gameInfo.on('quitToHome', this.goToHome.bind(this));
 
-    /* 预绑定 loop 函数，避免每帧创建新函数导致 GC 压力和动画循环重复 */
     this._boundLoop = this.loop.bind(this);
 
-    /* 初始化全局屏幕状态（必须在注册触摸事件后、loop 前设置） */
     GameGlobal.screenState = SCREEN_STATE.HOME;
     console.log('[Main] 初始化完成，屏幕状态:', GameGlobal.screenState);
     this.loop();
@@ -120,6 +120,7 @@ export default class Main {
     this.player.init();
     this.pipeTimer = 0;
     this.propTimer = 0;
+    this._lastPropScore = 0;
     this._scoreSubmitted = false;
     this._playedDieSound = false;
     this._prevScore = 0;
@@ -161,10 +162,9 @@ export default class Main {
 
   resumeGame() {
     if (this.screenState !== SCREEN_STATE.PAUSED) return;
-    /* 开始3秒倒计时 */
     this.screenState = SCREEN_STATE.COUNTDOWN;
     GameGlobal.screenState = SCREEN_STATE.COUNTDOWN;
-    this._countdownTimer = 180;  /* 3秒 = 180帧 */
+    this._countdownTimer = 180;
     this.gameInfo._countdownValue = 3;
   }
 
@@ -196,7 +196,6 @@ export default class Main {
   tick() {
     this.databus.frame++;
 
-    /* 倒计时中：只更新倒计时，不更新游戏逻辑 */
     if (this.screenState === SCREEN_STATE.COUNTDOWN) {
       this._countdownTimer--;
       this.gameInfo._countdownValue = Math.ceil(this._countdownTimer / 60);
@@ -208,7 +207,6 @@ export default class Main {
       return;
     }
 
-    /* 游戏结束后不再更新逻辑 */
     if (this.databus.isGameOver) return;
 
     this.player.update();
@@ -260,18 +258,21 @@ export default class Main {
     this.databus.pipes.push(pipe);
     this.pipeTimer = interval;
 
-    /* 概率生成道具 */
-    if (Math.random() < propChance) {
+    /* 道具生成：使用定时器控制间隔，防止扎堆和长期不刷 */
+    this.propTimer--;
+    if (this.propTimer <= 0 && Math.random() < propChance
+        && this.databus.props.length < 3) {
       this._createPropForPipe(pipe, speed);
+      this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
     }
 
-    /* 概率生成锯片（8分后），限制最大数量防止内存溢出 */
+    /* 概率生成锯片（8分后），放在两根水管之间，限制最大数量 */
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
     }
 
-    /* 概率生成火箭（20分后），限制最大数量防止内存溢出 */
+    /* 概率生成火箭（20分后），限制最大数量 */
     if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
         && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
@@ -287,16 +288,22 @@ export default class Main {
     prop.animPhase = Math.random() * Math.PI * 2;
     prop.speed = pipeSpeed;
     prop.x = pipe.x + PIPE_WIDTH / 2 - PROP_SIZE / 2;
-    prop._parentPipe = pipe;  /* 关联水管，用于移动水管跟随 */
+    prop._parentPipe = pipe;
 
     const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
     const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
     const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
 
     if (hasTop && hasBottom) {
+      /* 双管：放在间隙正中央 */
       const gapCenter = pipe.gapY + pipe.gap / 2;
       prop.y = gapCenter - PROP_SIZE / 2;
+      /* 确保不超出间隙范围 */
+      const minY = pipe.gapY + PROP_SAFE_MARGIN;
+      const maxY = pipe.gapY + pipe.gap - PROP_SAFE_MARGIN - PROP_SIZE;
+      prop.y = Math.max(minY, Math.min(maxY, prop.y));
     } else if (hasBottom) {
+      /* 只有下管：放在下管上方，确保安全边距 */
       const minY = 50;
       const maxY = pipe.gapY - PROP_SAFE_MARGIN - PROP_SIZE;
       if (maxY < minY) {
@@ -305,6 +312,7 @@ export default class Main {
         prop.y = minY + (maxY - minY) * 0.4;
       }
     } else {
+      /* 只有上管：放在上管下方，确保安全边距 */
       const minY = pipe.gapY + PROP_SAFE_MARGIN;
       const maxY = availableH - PROP_SIZE - 30;
       if (maxY < minY) {
@@ -318,8 +326,13 @@ export default class Main {
   }
 
   _createSawForPipe(pipe, pipeSpeed) {
+    /* 锯片放在当前水管和下一根水管之间（或当前水管和屏幕右边缘之间） */
+    const pipes = this.databus.pipes;
+    const idx = pipes.indexOf(pipe);
+    const nextPipe = idx < pipes.length - 1 ? pipes[idx + 1] : null;
+
     const saw = this.databus.pool.getItemByClass('saw', Saw);
-    saw.init(pipeSpeed, pipe);
+    saw.init(pipeSpeed, pipe, nextPipe);
     this.databus.saws.push(saw);
   }
 
@@ -353,11 +366,14 @@ export default class Main {
       if (prop.collected) continue;
       prop.x -= prop.speed;
 
-      /* 跟随移动水管 */
+      /* 跟随移动水管同步更新Y坐标 */
       if (prop._parentPipe && prop._parentPipe.pipeType === 3) {
         const p = prop._parentPipe;
         const gapCenter = p.gapY + p.gap / 2;
-        prop.y = gapCenter - PROP_SIZE / 2;
+        const newY = gapCenter - PROP_SIZE / 2;
+        const minY = p.gapY + PROP_SAFE_MARGIN;
+        const maxY = p.gapY + p.gap - PROP_SAFE_MARGIN - PROP_SIZE;
+        prop.y = Math.max(minY, Math.min(maxY, newY));
       }
 
       if (prop.x + prop.width < -10) {
@@ -381,7 +397,6 @@ export default class Main {
     for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
       const rocket = this.databus.rockets[i];
       rocket.update();
-      /* 火箭飞出屏幕左边界、右边界、上边界或下边界时回收 */
       if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 30
           || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
         this.databus.rockets.splice(i, 1);
@@ -451,9 +466,14 @@ export default class Main {
       const prop = this.databus.props[i];
       if (prop.collected) continue;
       if (this._isPropCollideWithPlayer(prop)) {
-        /* 护盾冷却中不能拾取 */
         if (prop.type === 'shield' && this.databus.shieldCooldown > 0) continue;
         prop.collect();
+        /* 道具拾取音效 */
+        if (prop.type === 'shield') {
+          GameGlobal.sound.playShieldPickup();
+        } else {
+          GameGlobal.sound.playScoreX2();
+        }
       }
     }
   }
@@ -473,7 +493,7 @@ export default class Main {
       this.databus.shieldTimer--;
       if (this.databus.shieldTimer <= 0) {
         this.databus.shieldActive = false;
-        this.databus.shieldCooldown = SHIELD_COOLDOWN;  /* 开始冷却 */
+        this.databus.shieldCooldown = SHIELD_COOLDOWN;
       }
     }
     if (this.databus.shieldCooldown > 0) {

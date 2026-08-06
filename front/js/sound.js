@@ -29,6 +29,12 @@ export default class Sound {
 
     /* 护盾破裂音效 */
     this.shieldBreak = this._createAudio('audio/shield_break.mp3', AUDIO_VOLUME.shieldBreak);
+
+    /* 护盾拾取音效 */
+    this.shieldPickup = this._createAudio('audio/shield_pickup.flac', AUDIO_VOLUME.shieldPickup);
+
+    /* 双倍分数拾取音效 */
+    this.scoreX2 = this._createAudio('audio/score_x2.wav', AUDIO_VOLUME.scoreX2);
   }
 
   _createAudio(src, volume) {
@@ -85,6 +91,16 @@ export default class Sound {
     this.shieldBreak.play();
   }
 
+  playShieldPickup() {
+    this.shieldPickup.stop();
+    this.shieldPickup.play();
+  }
+
+  playScoreX2() {
+    this.scoreX2.stop();
+    this.scoreX2.play();
+  }
+
   /* 停止所有音效 */
   stopAll() {
     this.stopBgm();
@@ -94,5 +110,7 @@ export default class Sound {
     this.die.stop();
     this.swoosh.stop();
     this.shieldBreak.stop();
+    this.shieldPickup.stop();
+    this.scoreX2.stop();
   }
 }

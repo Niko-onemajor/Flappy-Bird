@@ -9,6 +9,8 @@ export const AUDIO_VOLUME = {
   die: 0.3,
   swoosh: 0.25,
   shieldBreak: 0.4,
+  shieldPickup: 0.35,
+  scoreX2: 0.35,
 };
 
 /* ========== 地面配置 ========== */
