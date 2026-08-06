@@ -264,18 +264,23 @@ export default class Main {
         && this.databus.props.length < 3) {
       this._createPropForPipe(pipe, speed);
       this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
+      console.log(`[Prop] 生成道具 propTimer重置=${this.propTimer} 场上道具=${this.databus.props.length}`);
+    } else if (this.propTimer <= 0) {
+      console.log(`[Prop] 跳过生成 propTimer=${this.propTimer} props.length=${this.databus.props.length} propChance=${propChance.toFixed(2)}`);
     }
 
     /* 概率生成锯片（8分后），放在两根水管之间，限制最大数量 */
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
+      console.log(`[Saw] 触发生成 score=${this.databus.score} saws.length=${this.databus.saws.length}`);
     }
 
     /* 概率生成火箭（20分后），限制最大数量 */
     if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
         && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
+      console.log(`[Rocket] 触发生成 score=${this.databus.score} rockets.length=${this.databus.rockets.length}`);
     }
   }
 

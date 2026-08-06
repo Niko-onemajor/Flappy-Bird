@@ -5,6 +5,9 @@ import { GROUND, ROCKET as ROCKET_CFG } from '../config';
 const ROCKET_W = ROCKET_CFG.WIDTH;
 const ROCKET_H = ROCKET_CFG.HEIGHT;
 
+/* 预加载火箭图片（与 pipe 同款模块级 IIFE，游戏启动时即加载） */
+const ROCKET_IMG = (() => { const img = wx.createImage(); img.src = 'images/rocket.png'; return img; })();
+
 export default class Rocket extends Sprite {
   speed = 5;
   trailPhase = 0;
@@ -13,7 +16,7 @@ export default class Rocket extends Sprite {
   targetY = 0;
 
   constructor() {
-    super('images/rocket.png', ROCKET_W, ROCKET_H);
+    super('', ROCKET_W, ROCKET_H);
   }
 
   init(pipeSpeed, pipe) {
@@ -23,14 +26,14 @@ export default class Rocket extends Sprite {
     this.trailPhase = 0;
     this.x = SCREEN_WIDTH + 40 + Math.random() * 60;
 
-    /* 计算Y坐标 */
     this.y = this._calcY(pipe);
 
-    /* 锁定玩家刷新时的位置，计算飞行角度 */
     const player = GameGlobal.databus.player;
     this.targetX = player.x;
     this.targetY = player.y;
     this.angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
+
+    console.log(`[Rocket] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}° speed=${this.speed.toFixed(1)}`);
   }
 
   _calcY(pipe) {
@@ -83,13 +86,13 @@ export default class Rocket extends Sprite {
     ctx.translate(cx, cy);
     ctx.rotate(this.angle);
 
-    /* 火焰尾迹 - 用简单矩形避免渐变 bug */
+    /* 火焰尾迹 */
     ctx.fillStyle = 'rgba(255, 120, 20, 0.5)';
     const trailLen = 16 + Math.sin(this.trailPhase) * 4;
     ctx.fillRect(this.width / 2, -this.height / 2 + 4, trailLen, this.height - 8);
 
     /* 火箭本体 */
-    ctx.drawImage(this.img, -this.width / 2, -this.height / 2, this.width, this.height);
+    ctx.drawImage(ROCKET_IMG, -this.width / 2, -this.height / 2, this.width, this.height);
 
     ctx.restore();
   }
