@@ -52,7 +52,7 @@ const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
 const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
-const ROCKET_COOLDOWN = 40;  /* 火箭生成冷却帧数（0.67秒），缩短间隔保证稳定出现 */
+/* 火箭动态难度：maxRockets 和 cooldown 由 _getRocketLevel 根据分数计算 */
 
 /* 碰撞箱可视化调试开关 */
 GameGlobal.DEBUG_COLLISION = false;
@@ -340,21 +340,32 @@ export default class Main {
     this.databus.rockets.push(rocket);
   }
 
-  /* 火箭独立生成：每帧调用，20分后开始，从右侧进入，2秒追踪后锁定发射 */
+  /* 火箭难度等级：每6分提升一级，数量+1、冷却缩短 */
+  _getRocketLevel(score) {
+    const level = Math.floor((score - ROCKET_MIN_SCORE) / 6) + 1;
+    const maxRockets = Math.min(level, 6);
+    const cooldown = Math.max(90 - (level - 1) * 20, 30)
+      + Math.floor(Math.random() * 20);
+    return { level, maxRockets, cooldown };
+  }
+
+  /* 火箭独立生成：每帧调用，12分后开始，从右侧进入，2秒追踪后锁定发射 */
   _tryGenerateRocket() {
     const frame = this.databus.frame;
+    const score = this.databus.score;
 
-    if (this.databus.score < ROCKET_MIN_SCORE) {
-      /* 每60帧输出一次状态，避免刷屏 */
+    if (score < ROCKET_MIN_SCORE) {
       if (frame % 60 === 0) {
-        console.log(`[Rocket] frame=${frame} 等待分数达标 score=${this.databus.score}/${ROCKET_MIN_SCORE}`);
+        console.log(`[Rocket] frame=${frame} 等待分数达标 score=${score}/${ROCKET_MIN_SCORE}`);
       }
       return;
     }
 
-    if (this.databus.rockets.length >= 6) {
+    const { maxRockets, cooldown } = this._getRocketLevel(score);
+
+    if (this.databus.rockets.length >= maxRockets) {
       if (frame % 60 === 0) {
-        console.log(`[Rocket] frame=${frame} 场上火箭已满 rockets=${this.databus.rockets.length}/6 跳过`);
+        console.log(`[Rocket] frame=${frame} 场上已满 rockets=${this.databus.rockets.length}/${maxRockets} 跳过`);
       }
       return;
     }
@@ -362,12 +373,12 @@ export default class Main {
     this.rocketTimer--;
     if (this.rocketTimer > 0) {
       if (this.rocketTimer % 20 === 0) {
-        console.log(`[Rocket] frame=${frame} 冷却中 timer=${this.rocketTimer} rockets=${this.databus.rockets.length}/6`);
+        console.log(`[Rocket] frame=${frame} 冷却中 timer=${this.rocketTimer} rockets=${this.databus.rockets.length}/${maxRockets}`);
       }
       return;
     }
 
-    console.log(`[Rocket] frame=${frame} 冷却完毕! 尝试生成 score=${this.databus.score} rockets=${this.databus.rockets.length}/6`);
+    console.log(`[Rocket] frame=${frame} 冷却完毕! 尝试生成 score=${score} rockets=${this.databus.rockets.length}/${maxRockets}`);
 
     const effectiveChance = GameGlobal.DEBUG_SKIP_SCORE ? 1.0 : ROCKET_SPAWN_CHANCE;
     const roll = Math.random();
@@ -392,7 +403,7 @@ export default class Main {
       }
     }
 
-    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 30);
+    this.rocketTimer = cooldown;
     console.log(`[Rocket] frame=${frame} 重置冷却 timer=${this.rocketTimer}`);
   }
 
