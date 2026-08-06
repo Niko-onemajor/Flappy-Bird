@@ -52,7 +52,7 @@ const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
 const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
-const ROCKET_COOLDOWN = 90;  /* 火箭生成冷却帧数（1.5秒），保证稳定出现 */
+const ROCKET_COOLDOWN = 40;  /* 火箭生成冷却帧数（0.67秒），缩短间隔保证稳定出现 */
 
 /* 碰撞箱可视化调试开关 */
 GameGlobal.DEBUG_COLLISION = true;
@@ -381,7 +381,7 @@ export default class Main {
       console.log(`[Rocket] 随机未命中 rand<${ROCKET_SPAWN_CHANCE}`);
     }
 
-    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 60);
+    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 30);
   }
 
   _updatePipes() {

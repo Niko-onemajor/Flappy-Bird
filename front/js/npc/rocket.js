@@ -94,12 +94,13 @@ export default class Rocket extends Sprite {
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(this.angle);
+    /* 火箭图片默认头朝上，需加 π/2 偏转使箭头指向飞行方向 */
+    ctx.rotate(this.angle + Math.PI / 2);
 
-    /* 火焰尾迹 */
+    /* 火焰尾迹（火箭尾部 = 图片底部） */
     ctx.fillStyle = 'rgba(255, 120, 20, 0.5)';
     const trailLen = 16 + Math.sin(this.trailPhase) * 4;
-    ctx.fillRect(this.width / 2, -this.height / 2 + 4, trailLen, this.height - 8);
+    ctx.fillRect(-trailLen / 2, this.height / 2 - 2, trailLen, 8);
 
     /* 火箭本体 */
     ctx.drawImage(ROCKET_IMG, -this.width / 2, -this.height / 2, this.width, this.height);
