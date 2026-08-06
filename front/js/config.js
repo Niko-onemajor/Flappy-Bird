@@ -24,7 +24,7 @@ export const GROUND = {
 export const PIPE = {
   WIDTH: 52,
   MIN_LENGTH: 40,
-  CLEARANCE: 55,
+  CLEARANCE: 80,
   MOVE_RANGE: 30,
   MIN_SPACING: 220,   /* 两对水管之间最小像素距离 */
   HITBOX_SHRINK: 6,
@@ -63,7 +63,7 @@ export const PROP = {
 export const SAW = {
   RADIUS: 22,
   MIN_SCORE: 8,        /* 8分后才出现 */
-  SPAWN_CHANCE: 0.25,  /* 每个水管25%概率附带锯片 */
+  SPAWN_CHANCE: 0.45,  /* 每个水管45%概率附带锯片 */
 };
 
 /* ========== 火箭障碍物配置 ========== */
@@ -72,7 +72,7 @@ export const ROCKET = {
   HEIGHT: 24,
   SPEED: 5,
   MIN_SCORE: 20,       /* 20分后才出现 */
-  SPAWN_CHANCE: 0.2,   /* 每个水管20%概率附带火箭 */
+  SPAWN_CHANCE: 0.4,   /* 每个水管40%概率附带火箭 */
 };
 
 /* ========== 玩家配置 ========== */

@@ -37,11 +37,11 @@ export default class GameInfo extends Emitter {
     this._lastTouchY = 0;            /* 上一次触摸Y坐标（用于滑动） */
     this._countdownValue = 0;        /* 倒计时秒数 */
 
-    /* 暂停按钮（右上角） */
+    /* 暂停按钮（左上角） */
     this.pauseBtnArea = {
-      startX: SCREEN_WIDTH - 50,
+      startX: 10,
       startY: 8,
-      endX: SCREEN_WIDTH - 10,
+      endX: 50,
       endY: 42,
     };
 
