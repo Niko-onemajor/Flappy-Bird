@@ -1,6 +1,6 @@
 import Emitter from '../libs/tinyemitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
-import { GROUND, PROP } from '../config';
+import { GROUND, PROP, PLAYER } from '../config';
 
 export default class GameInfo extends Emitter {
   constructor() {
@@ -94,6 +94,10 @@ export default class GameInfo extends Emitter {
     wx.onTouchMove(this._touchMoveHandler);
     this._touchEndHandler = this.touchEndHandler.bind(this);
     wx.onTouchEnd(this._touchEndHandler);
+
+    /* 预加载心形图片 */
+    this.heartImg = wx.createImage();
+    this.heartImg.src = 'images/heart_full.png';
   }
 
   /* ========== 主页渲染 ========== */
@@ -333,6 +337,7 @@ export default class GameInfo extends Emitter {
     /* 暂停按钮（游戏进行中且未结束时显示） */
     if (!databus.isGameOver && GameGlobal.screenState === 'playing') {
       this._renderPauseBtn(ctx);
+      this._renderHearts(ctx, databus);
     }
 
     /* 游戏结束 */
@@ -579,6 +584,31 @@ export default class GameInfo extends Emitter {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('⏸', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2);
+  }
+
+  /* ========== 生命值显示 ========== */
+  _renderHearts(ctx, db) {
+    const heartSize = 18;
+    const heartGap = 4;
+    const heartY = (this.pauseBtnArea.startY + this.pauseBtnArea.endY) / 2 - heartSize / 2;
+    const heartStartX = this.pauseBtnArea.endX + 10;
+
+    for (let i = 0; i < PLAYER.LIVES; i++) {
+      const hx = heartStartX + i * (heartSize + heartGap);
+      if (i < db.lives) {
+        /* 有生命：绘制实心心形 */
+        if (this.heartImg) {
+          ctx.drawImage(this.heartImg, hx, heartY, heartSize, heartSize);
+        }
+      } else {
+        /* 已失去：绘制空心灰色心形 */
+        ctx.globalAlpha = 0.3;
+        if (this.heartImg) {
+          ctx.drawImage(this.heartImg, hx, heartY, heartSize, heartSize);
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 
   /* ========== 暂停面板 ========== */

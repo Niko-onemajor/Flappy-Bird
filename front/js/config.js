@@ -87,4 +87,6 @@ export const PLAYER = {
   SHIELD_RADIUS: 28,
   SHIELD_PULSE: 0.05,
   FLAP_INTERVAL: 8,
+  LIVES: 3,                    /* 初始生命数 */
+  INVINCIBLE_DURATION: 90,     /* 受伤后无敌帧数（1.5秒） */
 };

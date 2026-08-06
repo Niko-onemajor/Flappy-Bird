@@ -23,6 +23,10 @@ export default class DataBus {
   scoreMultiplier = 1;     /* 分数倍率 */
   multiplierTimer = 0;     /* 倍率剩余时间 */
 
+  /* 生命系统 */
+  lives = 3;               /* 剩余生命 */
+  invincibleTimer = 0;     /* 无敌时间（帧） */
+
   constructor() {
     if (instance) return instance;
     instance = this;
@@ -42,6 +46,8 @@ export default class DataBus {
     this.shieldCooldown = 0;
     this.scoreMultiplier = 1;
     this.multiplierTimer = 0;
+    this.lives = 3;
+    this.invincibleTimer = 0;
   }
 
   gameOver() {

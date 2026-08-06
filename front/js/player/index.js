@@ -96,21 +96,39 @@ export default class Player extends Animation {
       this.vy = 0.5;
     }
 
-    /* 撞到地面 → 游戏结束 */
+    /* 撞到地面 —— 扣一条命，无敌后复活 */
     const groundY = SCREEN_HEIGHT - GROUND_Y_OFFSET - this.height;
     if (this.y >= groundY) {
       this.y = groundY;
-      this.destroy();
-      GameGlobal.databus.gameOver();
+      this.vy = 0;
+      const db = GameGlobal.databus;
+      if (db.invincibleTimer > 0) return;  /* 无敌中，忽略 */
+      db.lives--;
+      console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
+      if (db.lives <= 0) {
+        this.destroy();
+        db.gameOver();
+      } else {
+        db.invincibleTimer = PLAYER.INVINCIBLE_DURATION;
+        /* 复活到屏幕中央偏上 */
+        this.y = SCREEN_HEIGHT / 3;
+        this.vy = PLAYER.JUMP_VELOCITY * 0.5;
+      }
     }
   }
 
   render(ctx) {
     if (!this.visible) return;
 
+    const db = GameGlobal.databus;
+
+    /* 无敌闪烁效果：每6帧切换可见性 */
+    if (db.invincibleTimer > 0 && Math.floor(db.invincibleTimer / 6) % 2 === 0) {
+      return;  /* 闪烁帧：不渲染 */
+    }
+
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
-    const db = GameGlobal.databus;
 
     /* Buff特效 */
     if (db.shieldActive) {

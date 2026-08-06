@@ -341,47 +341,58 @@ export default class Main {
 
   /* 火箭独立生成：每帧调用，20分后开始，从右侧进入，2秒追踪后锁定发射 */
   _tryGenerateRocket() {
+    const frame = this.databus.frame;
+
     if (this.databus.score < ROCKET_MIN_SCORE) {
       /* 每60帧输出一次状态，避免刷屏 */
-      if (this.databus.frame % 60 === 0) {
-        console.log(`[Rocket] 等待分数达标 score=${this.databus.score}/${ROCKET_MIN_SCORE}`);
+      if (frame % 60 === 0) {
+        console.log(`[Rocket] frame=${frame} 等待分数达标 score=${this.databus.score}/${ROCKET_MIN_SCORE}`);
       }
       return;
     }
-    if (this.databus.rockets.length >= 6) return;
+
+    if (this.databus.rockets.length >= 6) {
+      if (frame % 60 === 0) {
+        console.log(`[Rocket] frame=${frame} 场上火箭已满 rockets=${this.databus.rockets.length}/6 跳过`);
+      }
+      return;
+    }
 
     this.rocketTimer--;
     if (this.rocketTimer > 0) {
-      if (this.rocketTimer % 30 === 0) {
-        console.log(`[Rocket] 冷却中 timer=${this.rocketTimer}`);
+      if (this.rocketTimer % 20 === 0) {
+        console.log(`[Rocket] frame=${frame} 冷却中 timer=${this.rocketTimer} rockets=${this.databus.rockets.length}/6`);
       }
       return;
     }
 
-    console.log(`[Rocket] 尝试生成 timer=0 score=${this.databus.score} chance=${ROCKET_SPAWN_CHANCE}`);
+    console.log(`[Rocket] frame=${frame} 冷却完毕! 尝试生成 score=${this.databus.score} rockets=${this.databus.rockets.length}/6`);
+
     const effectiveChance = GameGlobal.DEBUG_SKIP_SCORE ? 1.0 : ROCKET_SPAWN_CHANCE;
-    if (Math.random() < effectiveChance) {
+    const roll = Math.random();
+    console.log(`[Rocket] frame=${frame} 概率判定 roll=${roll.toFixed(3)} chance=${effectiveChance.toFixed(2)} ${roll < effectiveChance ? '✓命中' : '✗未命中'}`);
+
+    if (roll < effectiveChance) {
       const { speed } = this._getDifficulty();
       const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
       if (!rocket) {
-        console.error('[Rocket] 对象池获取失败！');
+        console.error(`[Rocket] frame=${frame} 对象池获取失败!`);
         this.rocketTimer = 10;
         return;
       }
       try {
         rocket.init(speed);
         this.databus.rockets.push(rocket);
-        console.log(`[Rocket] 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
+        console.log(`[Rocket] frame=${frame} 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
       } catch (e) {
-        console.error('[Rocket] init崩溃:', e);
+        console.error(`[Rocket] frame=${frame} init崩溃:`, e);
         this.rocketTimer = 10;
         return;
       }
-    } else {
-      console.log(`[Rocket] 随机未命中 rand<${ROCKET_SPAWN_CHANCE}`);
     }
 
     this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 30);
+    console.log(`[Rocket] frame=${frame} 重置冷却 timer=${this.rocketTimer}`);
   }
 
   _updatePipes() {
@@ -454,6 +465,7 @@ export default class Main {
     for (let i = this.databus.pipes.length - 1; i >= 0; i--) {
       const pipe = this.databus.pipes[i];
       if (pipe.isCollideWithBird(this.player)) {
+        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
           this.databus.removePipe(pipe);
           this.databus.shieldActive = false;
@@ -461,8 +473,7 @@ export default class Main {
           GameGlobal.sound.playShieldBreak();
           continue;
         }
-        this.player.destroy();
-        this.databus.gameOver();
+        this._onPlayerHit();
         return;
       }
     }
@@ -471,6 +482,7 @@ export default class Main {
     for (let i = this.databus.saws.length - 1; i >= 0; i--) {
       const saw = this.databus.saws[i];
       if (saw.isCollideWithBird(this.player)) {
+        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
           this.databus.saws.splice(i, 1);
           this.databus.pool.recover('saw', saw);
@@ -479,8 +491,7 @@ export default class Main {
           GameGlobal.sound.playShieldBreak();
           continue;
         }
-        this.player.destroy();
-        this.databus.gameOver();
+        this._onPlayerHit();
         return;
       }
     }
@@ -489,6 +500,7 @@ export default class Main {
     for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
       const rocket = this.databus.rockets[i];
       if (rocket.isCollideWithBird(this.player)) {
+        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
           this.databus.rockets.splice(i, 1);
           this.databus.pool.recover('rocket', rocket);
@@ -497,8 +509,7 @@ export default class Main {
           GameGlobal.sound.playShieldBreak();
           continue;
         }
-        this.player.destroy();
-        this.databus.gameOver();
+        this._onPlayerHit();
         return;
       }
     }
@@ -531,6 +542,9 @@ export default class Main {
   }
 
   _updateTimers() {
+    if (this.databus.invincibleTimer > 0) {
+      this.databus.invincibleTimer--;
+    }
     if (this.databus.shieldActive) {
       this.databus.shieldTimer--;
       if (this.databus.shieldTimer <= 0) {
@@ -544,6 +558,21 @@ export default class Main {
     if (this.databus.scoreMultiplier > 1) {
       this.databus.multiplierTimer--;
       if (this.databus.multiplierTimer <= 0) this.databus.scoreMultiplier = 1;
+    }
+  }
+
+  /* 玩家受伤：扣一条命，短暂无敌 */
+  _onPlayerHit() {
+    this.databus.lives--;
+    console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
+    GameGlobal.sound.playHit();
+
+    if (this.databus.lives <= 0) {
+      this.player.destroy();
+      this.databus.gameOver();
+      GameGlobal.sound.playDie();
+    } else {
+      this.databus.invincibleTimer = PLAYER.INVINCIBLE_DURATION;
     }
   }
 
