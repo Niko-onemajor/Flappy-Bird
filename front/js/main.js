@@ -76,6 +76,7 @@ export default class Main {
 
   constructor() {
     this.player = new Player();
+    this.databus.player = this.player;  /* 绑定到全局，供Rocket等组件访问 */
     this.gameInfo.on('start', this.startGame.bind(this));
     this.gameInfo.on('restart', this.restartGame.bind(this));
     this.gameInfo.on('backToHome', this.goToHome.bind(this));

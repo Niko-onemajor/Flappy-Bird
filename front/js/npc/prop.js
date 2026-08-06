@@ -51,8 +51,8 @@ export default class Prop extends Sprite {
     this.speed = pipe.speed;
     this._parentPipe = pipe;
 
-    /* 第一步：先确定X —— 放在水管正中央 */
-    this.x = pipe.x + PIPE_WIDTH / 2 - PROP_SIZE / 2;
+    /* 第一步：先确定X —— 放在水管中央，加入随机偏移防止重叠 */
+    this.x = pipe.x + PIPE_WIDTH / 2 - PROP_SIZE / 2 + (Math.random() - 0.5) * 20;
 
     /* 第二步：基于水管精确计算Y —— 确保在玩家必经之路上 */
     this.y = this._findSafeY(pipe);
