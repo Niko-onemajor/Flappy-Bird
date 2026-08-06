@@ -26,6 +26,9 @@ export default class Sound {
 
     /* 俯冲音效 */
     this.swoosh = this._createAudio('audio/swoosh.wav', AUDIO_VOLUME.swoosh);
+
+    /* 护盾破裂音效 */
+    this.shieldBreak = this._createAudio('audio/shield_break.mp3', AUDIO_VOLUME.shieldBreak);
   }
 
   _createAudio(src, volume) {
@@ -77,6 +80,11 @@ export default class Sound {
     this.swoosh.play();
   }
 
+  playShieldBreak() {
+    this.shieldBreak.stop();
+    this.shieldBreak.play();
+  }
+
   /* 停止所有音效 */
   stopAll() {
     this.stopBgm();
@@ -85,5 +93,6 @@ export default class Sound {
     this.hit.stop();
     this.die.stop();
     this.swoosh.stop();
+    this.shieldBreak.stop();
   }
 }

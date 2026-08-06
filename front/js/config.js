@@ -8,6 +8,7 @@ export const AUDIO_VOLUME = {
   hit: 0.35,
   die: 0.3,
   swoosh: 0.25,
+  shieldBreak: 0.4,
 };
 
 /* ========== 地面配置 ========== */
@@ -59,7 +60,7 @@ export const PROP = {
 /* ========== 圆锯障碍物配置 ========== */
 export const SAW = {
   RADIUS: 22,
-  MIN_SCORE: 20,       /* 20分后才出现 */
+  MIN_SCORE: 8,        /* 8分后才出现 */
   SPAWN_CHANCE: 0.25,  /* 每个水管25%概率附带锯片 */
 };
 
@@ -68,7 +69,7 @@ export const ROCKET = {
   WIDTH: 50,
   HEIGHT: 24,
   SPEED: 5,
-  MIN_SCORE: 50,       /* 50分后才出现 */
+  MIN_SCORE: 20,       /* 20分后才出现 */
   SPAWN_CHANCE: 0.2,   /* 每个水管20%概率附带火箭 */
 };
 

@@ -5,12 +5,19 @@ import { GROUND, ROCKET as ROCKET_CFG } from '../config';
 const ROCKET_W = ROCKET_CFG.WIDTH;
 const ROCKET_H = ROCKET_CFG.HEIGHT;
 
-/* 预加载火箭图片 */
-const ROCKET_IMG = (() => { const img = wx.createImage(); img.src = 'images/rocket.png'; return img; })();
+/* 预加载火箭图片，使用 onload 回调确保加载状态可靠 */
+let rocketImgLoaded = false;
+const ROCKET_IMG = wx.createImage();
+ROCKET_IMG.onload = () => { rocketImgLoaded = true; };
+ROCKET_IMG.onerror = () => { rocketImgLoaded = false; };
+ROCKET_IMG.src = 'images/rocket.png';
 
 export default class Rocket extends Sprite {
   speed = 5;
   trailPhase = 0;
+  angle = 0;           /* 飞行方向角度 */
+  targetX = 0;         /* 锁定玩家X坐标 */
+  targetY = 0;         /* 锁定玩家Y坐标 */
 
   constructor() {
     super('', ROCKET_W, ROCKET_H);
@@ -25,6 +32,12 @@ export default class Rocket extends Sprite {
 
     /* 计算Y坐标，确保留出可通过空间 */
     this.y = this._calcY(pipe);
+
+    /* 锁定玩家刷新时的位置，计算飞行角度 */
+    const player = GameGlobal.databus.player;
+    this.targetX = player.x;
+    this.targetY = player.y;
+    this.angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
   }
 
   _calcY(pipe) {
@@ -36,13 +49,12 @@ export default class Rocket extends Sprite {
     const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
 
     if (hasTop && hasBottom) {
-      /* 双管：火箭放在间隙内，迫使玩家贴边通过 */
+      /* 双管：火箭放在间隙内 */
       const safeTop = pipe.gapY + minClearance;
       const safeBottom = pipe.gapY + pipe.gap - minClearance;
       if (safeBottom - safeTop < ROCKET_H) {
         return safeTop;
       }
-      /* 偏向一侧，留出另一边给玩家 */
       return Math.random() < 0.5
         ? safeTop + 10
         : safeBottom - ROCKET_H - 10;
@@ -50,14 +62,14 @@ export default class Rocket extends Sprite {
 
     if (hasBottom) {
       const maxY = pipe.gapY - ROCKET_H - minClearance;
-      if (maxY < 40) return Math.max(40, pipe.gapY - ROCKET_H - 4);
-      return 40 + Math.random() * Math.max(0, maxY - 40);
+      if (maxY < 30) return Math.max(30, pipe.gapY - ROCKET_H - 4);
+      return 30 + Math.random() * Math.max(0, maxY - 30);
     }
 
     if (hasTop) {
       const minY = pipe.gapY + minClearance;
-      const maxY = availableH - ROCKET_H - 20;
-      if (minY > maxY) return Math.min(maxY, pipe.gapY + ROCKET_H + 4);
+      const maxY = availableH - ROCKET_H - 10;
+      if (minY > maxY) return Math.min(maxY, pipe.gapY + 4);
       return minY + Math.random() * (maxY - minY);
     }
 
@@ -66,7 +78,9 @@ export default class Rocket extends Sprite {
 
   update() {
     if (GameGlobal.databus.isGameOver) return;
-    this.x -= this.speed;
+    /* 按锁定角度直线飞行 */
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
     this.trailPhase += 0.15;
   }
 
@@ -77,26 +91,29 @@ export default class Rocket extends Sprite {
     const cy = this.y + this.height / 2;
 
     ctx.save();
+    ctx.translate(cx, cy);
+    /* 火箭头朝向飞行方向（图片默认朝右，旋转 angle 使其指向目标） */
+    ctx.rotate(this.angle);
 
-    /* 火焰尾迹 */
+    /* 火焰尾迹（在火箭尾部，即图片右侧后方） */
     const trailLen = 20 + Math.sin(this.trailPhase) * 5;
-    const trailGrad = ctx.createLinearGradient(this.x + this.width, cy, this.x + this.width + trailLen, cy);
+    const trailGrad = ctx.createLinearGradient(this.width / 2, 0, this.width / 2 + trailLen, 0);
     trailGrad.addColorStop(0, 'rgba(255, 150, 30, 0.8)');
     trailGrad.addColorStop(0.5, 'rgba(255, 80, 10, 0.4)');
     trailGrad.addColorStop(1, 'rgba(255, 30, 0, 0)');
     ctx.fillStyle = trailGrad;
-    ctx.fillRect(this.x + this.width, this.y + 4, trailLen, this.height - 8);
+    ctx.fillRect(this.width / 2, -this.height / 2 + 4, trailLen, this.height - 8);
 
-    /* 防御性渲染：检查图片是否加载完成，避免真机 drawImage 抛异常导致整个渲染中断 */
-    if (ROCKET_IMG && ROCKET_IMG.complete && ROCKET_IMG.width > 0) {
-      ctx.drawImage(ROCKET_IMG, this.x, this.y, this.width, this.height);
+    /* 使用 onload 标志位判断图片是否加载完成 */
+    if (rocketImgLoaded) {
+      ctx.drawImage(ROCKET_IMG, -this.width / 2, -this.height / 2, this.width, this.height);
     } else {
       /* 图片未加载时的降级渲染：绘制火箭形状 */
       ctx.fillStyle = '#FF5722';
       ctx.strokeStyle = '#BF360C';
       ctx.lineWidth = 2;
-      const rx = this.x + 4;
-      const ry = this.y + 4;
+      const rx = -this.width / 2 + 4;
+      const ry = -this.height / 2 + 4;
       const rw = this.width - 8;
       const rh = this.height - 8;
       ctx.beginPath();

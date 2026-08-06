@@ -265,13 +265,13 @@ export default class Main {
       this._createPropForPipe(pipe, speed);
     }
 
-    /* 概率生成锯片（20分后），限制最大数量防止内存溢出 */
+    /* 概率生成锯片（8分后），限制最大数量防止内存溢出 */
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
     }
 
-    /* 概率生成火箭（50分后），限制最大数量防止内存溢出 */
+    /* 概率生成火箭（20分后），限制最大数量防止内存溢出 */
     if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
         && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
@@ -381,7 +381,9 @@ export default class Main {
     for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
       const rocket = this.databus.rockets[i];
       rocket.update();
-      if (rocket.x + rocket.width < -30) {
+      /* 火箭飞出屏幕左边界、右边界、上边界或下边界时回收 */
+      if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 30
+          || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
         this.databus.rockets.splice(i, 1);
         this.databus.pool.recover('rocket', rocket);
       }
@@ -399,6 +401,7 @@ export default class Main {
           this.databus.removePipe(pipe);
           this.databus.shieldActive = false;
           this.databus.shieldTimer = 0;
+          GameGlobal.sound.playShieldBreak();
           continue;
         }
         this.player.destroy();
@@ -416,6 +419,7 @@ export default class Main {
           this.databus.pool.recover('saw', saw);
           this.databus.shieldActive = false;
           this.databus.shieldTimer = 0;
+          GameGlobal.sound.playShieldBreak();
           continue;
         }
         this.player.destroy();
@@ -433,6 +437,7 @@ export default class Main {
           this.databus.pool.recover('rocket', rocket);
           this.databus.shieldActive = false;
           this.databus.shieldTimer = 0;
+          GameGlobal.sound.playShieldBreak();
           continue;
         }
         this.player.destroy();
