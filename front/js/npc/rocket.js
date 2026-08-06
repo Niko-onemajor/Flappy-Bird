@@ -39,8 +39,8 @@ export default class Rocket extends Sprite {
     this.state = 'tracking';
     this.trackTimer = TRACK_DURATION;
 
-    /* 从屏幕右侧更远处进入，给玩家反应时间 */
-    this.x = SCREEN_WIDTH + 180 + Math.random() * 100;
+    /* 从屏幕右侧进入，追踪阶段可见 */
+    this.x = SCREEN_WIDTH + 30 + Math.random() * 50;
     const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
     this.y = 40 + Math.random() * (availableH - ROCKET_H - 40);
 
