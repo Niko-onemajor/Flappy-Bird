@@ -451,7 +451,7 @@ export default class Main {
     for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
       const rocket = this.databus.rockets[i];
       rocket.update();
-      if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 30
+      if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 300
           || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
         rocket.cleanup();
         this.databus.rockets.splice(i, 1);
