@@ -6,8 +6,14 @@ const ROCKET_W = ROCKET_CFG.WIDTH;
 const ROCKET_H = ROCKET_CFG.HEIGHT;
 const TRACK_DURATION = 120;  /* 追踪阶段：120帧 = 2秒 */
 
-/* 预加载火箭图片 */
-const ROCKET_IMG = (() => { const img = wx.createImage(); img.src = 'images/rocket.png'; return img; })();
+/* 预加载火箭图片（带错误检测） */
+const ROCKET_IMG = (() => {
+  const img = wx.createImage();
+  img.onload = () => console.log('[Rocket] 图片加载成功');
+  img.onerror = (e) => console.error('[Rocket] 图片加载失败!', e);
+  img.src = 'images/rocket.png';
+  return img;
+})();
 
 export default class Rocket extends Sprite {
   speed = 5;

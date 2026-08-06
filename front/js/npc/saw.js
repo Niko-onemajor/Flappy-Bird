@@ -23,24 +23,14 @@ export default class Saw extends Sprite {
     this.rotation = Math.random() * Math.PI * 2;
     this._hostPipe = pipe;
 
-    /* 水平位置：从屏幕右侧进入，放在两根水管之间的空白区域 */
-    /* 距离水管至少 80px，放在 prevPipe 右边缘到 SCREEN_WIDTH 之间 */
-    const prevRight = prevPipe ? Math.max(prevPipe.x + prevPipe.width, 0) : 0;
-    const gapSpace = SCREEN_WIDTH - prevRight;
-    const margin = Math.min(80, gapSpace * 0.2);
-    const usableSpace = gapSpace - margin * 2;
-
-    if (usableSpace > 80) {
-      this.x = prevRight + margin + Math.random() * usableSpace;
-    } else {
-      /* 第一根水管或空间不足，从右侧进入 */
-      this.x = SCREEN_WIDTH + 40 + Math.random() * 60;
-    }
+    /* 水平位置：始终从屏幕右侧进入，不突然出现在屏幕中间 */
+    /* 随机偏移让多个锯片不会排成一行 */
+    this.x = SCREEN_WIDTH + 40 + Math.random() * 80;
 
     /* 垂直位置：放在水管间隙上方或下方，不堵死玩家通路 */
     this.y = this._calcSawY(pipe);
 
-    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} prevRight=${prevRight.toFixed(1)} gapSpace=${gapSpace.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
+    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
   }
 
   /* 核心原则：锯片放在水管间隙上方或下方，永远不堵死玩家唯一通路 */

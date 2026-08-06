@@ -57,6 +57,9 @@ const ROCKET_COOLDOWN = 90;  /* 火箭生成冷却帧数（1.5秒），保证稳
 /* 碰撞箱可视化调试开关 */
 GameGlobal.DEBUG_COLLISION = true;
 
+/* 调试模式：启动后分数直接跳到25，方便测试火箭 */
+GameGlobal.DEBUG_SKIP_SCORE = true;
+
 /**
  * 本地游戏主循环 —— 游戏逻辑在本地运行，彻底消除网络延迟。
  * 后端仅用于分数提交和排行榜查询。
@@ -149,6 +152,11 @@ export default class Main {
     if (this.screenState === SCREEN_STATE.READY) {
       this.screenState = SCREEN_STATE.PLAYING;
       GameGlobal.screenState = SCREEN_STATE.PLAYING;
+      /* 调试：跳过前20分，立即测试火箭 */
+      if (GameGlobal.DEBUG_SKIP_SCORE) {
+        this.databus.score = 25;
+        console.log('[Debug] 分数跳过至25，开始测试火箭');
+      }
       return;
     }
 
@@ -333,18 +341,44 @@ export default class Main {
 
   /* 火箭独立生成：每帧调用，20分后开始，从右侧进入，2秒追踪后锁定发射 */
   _tryGenerateRocket() {
-    if (this.databus.score < ROCKET_MIN_SCORE) return;
+    if (this.databus.score < ROCKET_MIN_SCORE) {
+      /* 每60帧输出一次状态，避免刷屏 */
+      if (this.databus.frame % 60 === 0) {
+        console.log(`[Rocket] 等待分数达标 score=${this.databus.score}/${ROCKET_MIN_SCORE}`);
+      }
+      return;
+    }
     if (this.databus.rockets.length >= 6) return;
 
     this.rocketTimer--;
-    if (this.rocketTimer > 0) return;
+    if (this.rocketTimer > 0) {
+      if (this.rocketTimer % 30 === 0) {
+        console.log(`[Rocket] 冷却中 timer=${this.rocketTimer}`);
+      }
+      return;
+    }
 
-    if (Math.random() < ROCKET_SPAWN_CHANCE) {
+    console.log(`[Rocket] 尝试生成 timer=0 score=${this.databus.score} chance=${ROCKET_SPAWN_CHANCE}`);
+    const effectiveChance = GameGlobal.DEBUG_SKIP_SCORE ? 1.0 : ROCKET_SPAWN_CHANCE;
+    if (Math.random() < effectiveChance) {
       const { speed } = this._getDifficulty();
       const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
-      rocket.init(speed);
-      this.databus.rockets.push(rocket);
-      console.log(`[Rocket] 生成(每帧) score=${this.databus.score} speed=${speed.toFixed(1)} rockets=${this.databus.rockets.length}`);
+      if (!rocket) {
+        console.error('[Rocket] 对象池获取失败！');
+        this.rocketTimer = 10;
+        return;
+      }
+      try {
+        rocket.init(speed);
+        this.databus.rockets.push(rocket);
+        console.log(`[Rocket] 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
+      } catch (e) {
+        console.error('[Rocket] init崩溃:', e);
+        this.rocketTimer = 10;
+        return;
+      }
+    } else {
+      console.log(`[Rocket] 随机未命中 rand<${ROCKET_SPAWN_CHANCE}`);
     }
 
     this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 60);
