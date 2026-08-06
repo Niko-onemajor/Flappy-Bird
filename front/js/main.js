@@ -52,6 +52,10 @@ const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
 const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
+const ROCKET_COOLDOWN = 90;  /* 火箭生成冷却帧数（1.5秒），保证稳定出现 */
+
+/* 碰撞箱可视化调试开关 */
+GameGlobal.DEBUG_COLLISION = true;
 
 /**
  * 本地游戏主循环 —— 游戏逻辑在本地运行，彻底消除网络延迟。
@@ -67,6 +71,7 @@ export default class Main {
 
   pipeTimer = 0;
   propTimer = 0;            /* 道具生成冷却计时器 */
+  rocketTimer = 0;          /* 火箭生成冷却计时器（独立于水管生成） */
   _lastPropScore = 0;       /* 上次生成道具时的分数 */
   _scoreSubmitted = false;
   _playedDieSound = false;
@@ -120,6 +125,7 @@ export default class Main {
     this.player.init();
     this.pipeTimer = 0;
     this.propTimer = 0;
+    this.rocketTimer = 0;
     this._lastPropScore = 0;
     this._scoreSubmitted = false;
     this._playedDieSound = false;
@@ -288,12 +294,8 @@ export default class Main {
       console.log(`[Saw] 触发 score=${this.databus.score} saws=${this.databus.saws.length}`);
     }
 
-    /* 火箭（20分后）：基于刚生成的水管，pipe已通过init校验 */
-    if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
-        && this.databus.rockets.length < 6) {
-      this._createRocketForPipe(pipe, speed);
-      console.log(`[Rocket] 触发 score=${this.databus.score} rockets=${this.databus.rockets.length}`);
-    }
+    /* 火箭（20分后）：使用独立冷却计时器，不依赖水管生成时机 */
+    this._tryGenerateRocket(speed);
   }
 
   _createPropForPipe(pipe) {
@@ -324,6 +326,29 @@ export default class Main {
     const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
     rocket.init(pipeSpeed, pipe);
     this.databus.rockets.push(rocket);
+  }
+
+  /* 火箭独立生成逻辑：使用专用冷却计时器，每ROCKET_COOLDOWN帧尝试一次 */
+  _tryGenerateRocket(pipeSpeed) {
+    if (this.databus.score < ROCKET_MIN_SCORE) return;
+    if (this.databus.rockets.length >= 6) return;
+
+    this.rocketTimer--;
+    if (this.rocketTimer > 0) return;
+
+    if (Math.random() < ROCKET_SPAWN_CHANCE) {
+      /* 选取最近生成的水管来定位火箭Y坐标 */
+      const pipes = this.databus.pipes;
+      if (pipes.length === 0) {
+        this.rocketTimer = 10;
+        return;
+      }
+      const refPipe = pipes[pipes.length - 1];
+      this._createRocketForPipe(refPipe, pipeSpeed);
+      console.log(`[Rocket] 触发(独立计时器) score=${this.databus.score} rockets=${this.databus.rockets.length}`);
+    }
+
+    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 30);
   }
 
   _updatePipes() {

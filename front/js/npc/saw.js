@@ -23,14 +23,24 @@ export default class Saw extends Sprite {
     this.rotation = Math.random() * Math.PI * 2;
     this._hostPipe = pipe;
 
-    /* 水平位置：放在水管右侧的空白区域 */
+    /* 水平位置：放在当前水管与下一个水管之间的空白区域（30%~70%位置） */
     const gapStart = pipe.x + pipe.width;
-    this.x = gapStart + 20 + Math.random() * 30;
+    const gapEnd = SCREEN_WIDTH;  /* 下一个水管将从屏幕右侧生成 */
+    const gapSpace = gapEnd - gapStart;
+    /* 留出边距，避免紧贴水管 */
+    const margin = 40;
+    const usableSpace = gapSpace - margin * 2;
+    if (usableSpace > 60) {
+      this.x = gapStart + margin + Math.random() * usableSpace;
+    } else {
+      /* 空间不足时放在中间 */
+      this.x = gapStart + gapSpace / 2;
+    }
 
     /* 垂直位置：放在水管间隙上方或下方，不堵死玩家通路 */
     this.y = this._calcSawY(pipe);
 
-    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
+    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} gapSpace=${gapSpace.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
   }
 
   /* 核心原则：锯片放在水管间隙上方或下方，永远不堵死玩家唯一通路 */
@@ -91,6 +101,23 @@ export default class Saw extends Sprite {
     ctx.drawImage(SAW_IMG, -r, -r, this.width, this.height);
 
     ctx.restore();
+
+    /* 碰撞箱可视化（橙色圆形） */
+    if (GameGlobal.DEBUG_COLLISION) {
+      const hitR = r - 4;
+      ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, hitR, 0, Math.PI * 2);
+      ctx.stroke();
+      /* 圆心十字 */
+      ctx.strokeStyle = 'rgba(255, 165, 0, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 6, cy);
+      ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6);
+      ctx.stroke();
+    }
   }
 
   isCollideWithBird(bird) {

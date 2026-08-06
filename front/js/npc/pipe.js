@@ -154,6 +154,30 @@ export default class Pipe extends Sprite {
         ctx.drawImage(this.pipeImg, this.x, bottomY, this.width, bottomH);
       }
     }
+
+    /* 碰撞箱可视化（红色矩形） */
+    if (GameGlobal.DEBUG_COLLISION) {
+      const px = this.x + 2;
+      const pw = this.width - 4;
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.lineWidth = 2;
+      if (hasTop) {
+        ctx.strokeRect(px, 0, pw, this.gapY);
+      }
+      if (hasBottom) {
+        const bottomY = this.gapY + (hasTop ? this.gap : 0);
+        const bottomH = availableH - bottomY;
+        if (bottomH > 0) {
+          ctx.strokeRect(px, bottomY, pw, bottomH);
+        }
+      }
+      /* 间隙区域标记（绿色虚线） */
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(px, this.gapY, pw, hasTop && hasBottom ? this.gap : 0);
+      ctx.setLineDash([]);
+    }
   }
 
   isCollideWithBird(bird) {

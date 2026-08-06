@@ -166,6 +166,15 @@ export default class Prop extends Sprite {
     ctx.fillText(style.name, cx, cy + r + 10);
 
     ctx.restore();
+
+    /* 碰撞箱可视化（蓝色圆形） */
+    if (GameGlobal.DEBUG_COLLISION) {
+      ctx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   collect() {

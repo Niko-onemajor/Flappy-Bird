@@ -97,6 +97,24 @@ export default class Rocket extends Sprite {
     ctx.drawImage(ROCKET_IMG, -this.width / 2, -this.height / 2, this.width, this.height);
 
     ctx.restore();
+
+    /* 碰撞箱可视化（黄色AABB） */
+    if (GameGlobal.DEBUG_COLLISION) {
+      const rx = this.x + 4;
+      const ry = this.y + 2;
+      const rw = this.width - 8;
+      const rh = this.height - 4;
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(rx, ry, rw, rh);
+      /* 方向指示线 */
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(this.angle) * 20, cy + Math.sin(this.angle) * 20);
+      ctx.stroke();
+    }
   }
 
   isCollideWithBird(bird) {

@@ -137,6 +137,23 @@ export default class Player extends Animation {
     if (db.scoreMultiplier > 1) {
       this._renderMultiplierIcon(ctx, cx, cy);
     }
+
+    /* 碰撞箱可视化（绿色AABB） */
+    if (GameGlobal.DEBUG_COLLISION) {
+      const hitShrink = 6;
+      const hx = this.x + hitShrink;
+      const hy = this.y + hitShrink;
+      const hw = this.width - hitShrink * 2;
+      const hh = this.height - hitShrink * 2;
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hx, hy, hw, hh);
+      /* 中心点 */
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   /* 护盾视觉特效 */

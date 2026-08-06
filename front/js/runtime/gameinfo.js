@@ -34,7 +34,8 @@ export default class GameInfo extends Emitter {
     this._leaderboardData = null;
     this._leaderboardScrollY = 0;    /* 排行榜滚动偏移 */
     this._leaderboardMaxScroll = 0;  /* 排行榜最大滚动量 */
-    this._lastTouchY = 0;            /* 上一次触摸Y坐标（用于滑动） */
+    this._touchStartY = null;        /* 触摸起始Y坐标 */
+    this._scrollStartY = 0;          /* 触摸起始时的滚动位置 */
     this._countdownValue = 0;        /* 倒计时秒数 */
 
     /* 暂停按钮（左上角） */
@@ -91,6 +92,8 @@ export default class GameInfo extends Emitter {
     wx.onTouchStart(this._touchHandler);
     this._touchMoveHandler = this.touchMoveHandler.bind(this);
     wx.onTouchMove(this._touchMoveHandler);
+    this._touchEndHandler = this.touchEndHandler.bind(this);
+    wx.onTouchEnd(this._touchEndHandler);
   }
 
   /* ========== 主页渲染 ========== */
@@ -672,8 +675,9 @@ export default class GameInfo extends Emitter {
 
     /* 排行榜：记录起始触摸位置用于滚动 */
     if (GameGlobal.screenState === 'leaderboard') {
-      this._lastTouchY = clientY;
-      this._leaderboardScrollStartY = this._leaderboardScrollY;
+      this._touchStartY = clientY;
+      this._scrollStartY = this._leaderboardScrollY;
+      console.log('[Leaderboard] touchStart y=', clientY, 'scrollStart=', this._scrollStartY);
       if (
         clientX >= this.backBtnArea.startX &&
         clientX <= this.backBtnArea.endX &&
@@ -781,13 +785,20 @@ export default class GameInfo extends Emitter {
     if (GameGlobal.screenState !== 'leaderboard') return;
     if (!event.touches || event.touches.length === 0) return;
     if (this._leaderboardMaxScroll <= 0) return;
+    if (this._touchStartY == null) return;
 
     const { clientY } = event.touches[0];
-    const delta = this._lastTouchY - clientY;
-    this._lastTouchY = clientY;
-
-    this._leaderboardScrollY += delta;
+    /* 从起始触摸位置计算滑动偏移 */
+    const delta = this._touchStartY - clientY;
+    this._leaderboardScrollY = this._scrollStartY + delta;
     this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
+
+    console.log('[Leaderboard] touchMove clientY=', clientY, 'delta=', delta.toFixed(1), 'scrollY=', this._leaderboardScrollY.toFixed(1));
+  }
+
+  /* 触摸结束，清除状态 */
+  touchEndHandler() {
+    this._touchStartY = null;
   }
 
   /* ========== 辅助方法 ========== */
