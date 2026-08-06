@@ -87,8 +87,27 @@ export default class Rocket extends Sprite {
     ctx.fillStyle = trailGrad;
     ctx.fillRect(this.x + this.width, this.y + 4, trailLen, this.height - 8);
 
-    /* 火箭本体 */
-    ctx.drawImage(ROCKET_IMG, this.x, this.y, this.width, this.height);
+    /* 防御性渲染：检查图片是否加载完成，避免真机 drawImage 抛异常导致整个渲染中断 */
+    if (ROCKET_IMG && ROCKET_IMG.complete && ROCKET_IMG.width > 0) {
+      ctx.drawImage(ROCKET_IMG, this.x, this.y, this.width, this.height);
+    } else {
+      /* 图片未加载时的降级渲染：绘制火箭形状 */
+      ctx.fillStyle = '#FF5722';
+      ctx.strokeStyle = '#BF360C';
+      ctx.lineWidth = 2;
+      const rx = this.x + 4;
+      const ry = this.y + 4;
+      const rw = this.width - 8;
+      const rh = this.height - 8;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry + rh / 2);
+      ctx.lineTo(rx + rw * 0.6, ry);
+      ctx.lineTo(rx + rw, ry + rh / 2);
+      ctx.lineTo(rx + rw * 0.6, ry + rh);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
 
     ctx.restore();
   }

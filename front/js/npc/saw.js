@@ -89,11 +89,32 @@ export default class Saw extends Sprite {
     ctx.translate(cx, cy);
     ctx.rotate(this.rotation);
 
-    /* 外发光 */
-    ctx.shadowColor = 'rgba(255, 60, 30, 0.6)';
-    ctx.shadowBlur = 10;
-
-    ctx.drawImage(SAW_IMG, -r, -r, this.width, this.height);
+    /* 防御性渲染：检查图片是否加载完成，避免真机 drawImage 抛异常导致整个渲染中断 */
+    if (SAW_IMG && SAW_IMG.complete && SAW_IMG.width > 0) {
+      /* 外发光 */
+      ctx.shadowColor = 'rgba(255, 60, 30, 0.6)';
+      ctx.shadowBlur = 10;
+      ctx.drawImage(SAW_IMG, -r, -r, this.width, this.height);
+    } else {
+      /* 图片未加载时的降级渲染：绘制红色圆锯 */
+      ctx.shadowColor = 'rgba(255, 60, 30, 0.6)';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#D32F2F';
+      ctx.strokeStyle = '#B71C1C';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      /* 锯齿纹理 */
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2 + this.rotation;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * (r - 6), Math.sin(angle) * (r - 6));
+        ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        ctx.stroke();
+      }
+    }
 
     ctx.restore();
   }

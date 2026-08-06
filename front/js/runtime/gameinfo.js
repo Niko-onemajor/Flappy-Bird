@@ -378,12 +378,12 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 道具状态栏 - 显示在地面上方，避免遮挡玩家视角 */
+  /* 道具状态栏 - 显示在地面下方空白区域，避免遮挡玩家视角 */
   renderPropBar(ctx, db) {
     const barW = 140;
     const barH = 10;
     const barX = SCREEN_WIDTH / 2 - barW / 2;
-    const barY = SCREEN_HEIGHT - GROUND.HEIGHT - 14;  /* 地面上方14px */
+    const barY = SCREEN_HEIGHT - 30;  /* 地面下方，距底端30px */
 
     if (db.shieldActive) {
       const pct = db.shieldTimer / 300;  /* 300 = 5秒参考值 */
