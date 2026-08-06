@@ -285,16 +285,16 @@ export default class Main {
     this.pipeTimer = Math.max(interval, 30);  /* 保底最小值，防止过于接近0 */
     console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
 
-    /* 道具生成：基于刚生成的水管 */
-    this.propTimer--;
-    if (this.propTimer <= 0 && Math.random() < propChance
-        && this.databus.props.length < 3) {
-      this._createPropForPipe(pipe);
-      this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
-      console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
-    } else if (this.propTimer <= 0) {
-      this.propTimer = 1;  /* 跳过本次，重置计时器 */
-      console.log(`[Prop] 跳过 propTimer复归=${this.propTimer} props=${this.databus.props.length} chance=${propChance.toFixed(2)}`);
+    /* 道具生成：基于刚生成的水管（propTimer已由_updateTimers每帧递减） */
+    if (this.propTimer <= 0) {
+      if (Math.random() < propChance && this.databus.props.length < 3) {
+        this._createPropForPipe(pipe);
+        this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
+        console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
+      } else {
+        this.propTimer = 30;  /* 概率未命中，0.5秒后重试 */
+        console.log(`[Prop] 跳过 chance=${propChance.toFixed(2)} props=${this.databus.props.length} 重试timer=${this.propTimer}`);
+      }
     }
 
     /* 锯片（8分后）：基于刚生成的水管，pipe已通过init校验 */
@@ -567,6 +567,8 @@ export default class Main {
       this.databus.multiplierTimer--;
       if (this.databus.multiplierTimer <= 0) this.databus.scoreMultiplier = 1;
     }
+    /* 道具冷却计时器（每帧递减，真正的帧计数） */
+    if (this.propTimer > 0) this.propTimer--;
   }
 
   /* 玩家受伤：扣一条命，短暂无敌 */

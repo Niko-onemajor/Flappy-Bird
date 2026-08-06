@@ -74,7 +74,7 @@ export const ROCKET = {
   WIDTH: 50,
   HEIGHT: 24,
   SPEED: 5,
-  MIN_SCORE: 12,       /* 12分后才出现 */
+  MIN_SCORE: 10,       /* 10分后才出现 */
   SPAWN_CHANCE: 0.4,   /* 每个水管40%概率附带火箭 */
   /* 动态难度由 _tryGenerateRocket 根据分数计算 */
 };
