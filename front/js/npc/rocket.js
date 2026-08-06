@@ -25,6 +25,7 @@ export default class Rocket extends Sprite {
   trackTimer = 0;        /* 追踪剩余帧数 */
   _trackedX = 0;         /* 追踪到的玩家X */
   _trackedY = 0;         /* 追踪到的玩家Y */
+  exhaust = [];          /* 尾气粒子数组 */
 
   constructor() {
     super('', ROCKET_W, ROCKET_H);
@@ -36,6 +37,7 @@ export default class Rocket extends Sprite {
     this.isActive = true;
     this.speed = pipeSpeed * 1.2;
     this.trailPhase = 0;
+    this.exhaust = [];
     this.state = 'tracking';
     this.trackTimer = TRACK_DURATION;
 
@@ -95,6 +97,37 @@ export default class Rocket extends Sprite {
     this.x += Math.cos(this.angle) * this.speed;
     this.y += Math.sin(this.angle) * this.speed;
     this.trailPhase += 0.15;
+
+    /* 生成新尾气粒子（上限50个防止性能问题） */
+    if (this.exhaust.length < 50 && (this.state === 'flying' || (this.state === 'tracking' && this.trackTimer < 60))) {
+      const cx = this.x + this.width / 2;
+      const cy = this.y + this.height / 2;
+      /* 火箭尾部反方向生成粒子 */
+      const backOffsetX = -Math.cos(this.angle) * (this.height / 2 + 2);
+      const backOffsetY = -Math.sin(this.angle) * (this.height / 2 + 2);
+      const particle = {
+        x: cx + backOffsetX + (Math.random() - 0.5) * 4,
+        y: cy + backOffsetY + (Math.random() - 0.5) * 4,
+        size: 2 + Math.random() * 6,
+        alpha: 0.7 + Math.random() * 0.3,
+        life: 30 + Math.floor(Math.random() * 20),
+        vx: -Math.cos(this.angle) * (1 + Math.random() * 2),
+        vy: -Math.sin(this.angle) * (1 + Math.random() * 2),
+      };
+      this.exhaust.push(particle);
+    }
+
+    /* 更新已有粒子寿命 */
+    for (let i = this.exhaust.length - 1; i >= 0; i--) {
+      const p = this.exhaust[i];
+      p.life--;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.alpha *= 0.92;
+      if (p.life <= 0 || p.alpha < 0.05) {
+        this.exhaust.splice(i, 1);
+      }
+    }
   }
 
   render(ctx) {
@@ -103,15 +136,48 @@ export default class Rocket extends Sprite {
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
 
+    /* 绘制尾气粒子（世界坐标系） */
+    ctx.save();
+    for (const p of this.exhaust) {
+      if (p.alpha < 0.05) continue;
+      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      gradient.addColorStop(0, `rgba(255, 255, 200, ${p.alpha * 0.8})`);
+      gradient.addColorStop(0.3, `rgba(255, 160, 50, ${p.alpha * 0.6})`);
+      gradient.addColorStop(0.7, `rgba(255, 80, 20, ${p.alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(200, 30, 0, 0)`);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
     ctx.save();
     ctx.translate(cx, cy);
     /* 火箭图片默认头朝上，需加 π/2 偏转使箭头指向飞行方向 */
     ctx.rotate(this.angle + Math.PI / 2);
 
-    /* 火焰尾迹（火箭尾部 = 图片底部） */
-    ctx.fillStyle = 'rgba(255, 120, 20, 0.5)';
-    const trailLen = 16 + Math.sin(this.trailPhase) * 4;
-    ctx.fillRect(-trailLen / 2, this.height / 2 - 2, trailLen, 8);
+    /* 火焰尾迹（火箭尾部 = 图片底部）- 动态渐变火焰 */
+    const flameLen = 18 + Math.sin(this.trailPhase) * 6;
+    const flameW = 6 + Math.sin(this.trailPhase * 2) * 2;
+    const flameGrad = ctx.createLinearGradient(0, this.height / 2, 0, this.height / 2 + flameLen);
+    flameGrad.addColorStop(0, 'rgba(255, 200, 50, 0.9)');
+    flameGrad.addColorStop(0.4, 'rgba(255, 120, 20, 0.7)');
+    flameGrad.addColorStop(0.7, 'rgba(255, 50, 10, 0.4)');
+    flameGrad.addColorStop(1, 'rgba(200, 20, 0, 0)');
+    ctx.fillStyle = flameGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, this.height / 2 - 2);
+    ctx.quadraticCurveTo(-flameW, this.height / 2 + flameLen * 0.5, 0, this.height / 2 + flameLen);
+    ctx.quadraticCurveTo(flameW, this.height / 2 + flameLen * 0.5, 0, this.height / 2 - 2);
+    ctx.fill();
+    /* 内焰 */
+    ctx.fillStyle = 'rgba(255, 255, 200, 0.6)';
+    ctx.beginPath();
+    ctx.moveTo(0, this.height / 2);
+    ctx.quadraticCurveTo(-flameW * 0.3, this.height / 2 + flameLen * 0.4, 0, this.height / 2 + flameLen * 0.6);
+    ctx.quadraticCurveTo(flameW * 0.3, this.height / 2 + flameLen * 0.4, 0, this.height / 2);
+    ctx.fill();
 
     /* 火箭本体 */
     ctx.drawImage(ROCKET_IMG, -this.width / 2, -this.height / 2, this.width, this.height);
@@ -174,6 +240,7 @@ export default class Rocket extends Sprite {
 
   /* 火箭移除时清理音效 */
   cleanup() {
+    this.exhaust = [];
     if (GameGlobal.sound) {
       GameGlobal.sound.stopRocketFly();
       GameGlobal.sound.stopFuseBurn();

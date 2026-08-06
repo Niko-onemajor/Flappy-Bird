@@ -37,7 +37,7 @@ export default class Sound {
     this.scoreX2 = this._createAudio('audio/score_x2.wav', AUDIO_VOLUME.scoreX2);
 
     /* 火箭引信点燃音效（只播开头2秒引信声） */
-    this.fuseBurn = this._createAudio('audio/fuse_burn.mp3', AUDIO_VOLUME.fuseBurn);
+    this.fuseBurn = this._createAudio('audio/fuse_burn.wav', AUDIO_VOLUME.fuseBurn);
 
     /* 火箭飞行音效 */
     this.rocketFly = this._createAudio('audio/rocket_fly.mp3', AUDIO_VOLUME.rocketFly);
