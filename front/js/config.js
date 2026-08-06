@@ -11,6 +11,8 @@ export const AUDIO_VOLUME = {
   shieldBreak: 0.4,
   shieldPickup: 0.35,
   scoreX2: 0.35,
+  fuseBurn: 0.3,
+  rocketFly: 0.2,
 };
 
 /* ========== 地面配置 ========== */

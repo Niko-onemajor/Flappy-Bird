@@ -35,6 +35,12 @@ export default class Sound {
 
     /* 双倍分数拾取音效 */
     this.scoreX2 = this._createAudio('audio/score_x2.wav', AUDIO_VOLUME.scoreX2);
+
+    /* 火箭引信点燃音效（只播开头2秒引信声） */
+    this.fuseBurn = this._createAudio('audio/fuse_burn.mp3', AUDIO_VOLUME.fuseBurn);
+
+    /* 火箭飞行音效 */
+    this.rocketFly = this._createAudio('audio/rocket_fly.mp3', AUDIO_VOLUME.rocketFly);
   }
 
   _createAudio(src, volume) {
@@ -101,6 +107,27 @@ export default class Sound {
     this.scoreX2.play();
   }
 
+  /* 火箭引信点燃：设置播放位置为0，2秒后自动停止 */
+  playFuseBurn() {
+    this.fuseBurn.stop();
+    this.fuseBurn.seek(0);
+    this.fuseBurn.play();
+    /* 2秒后停止，只取引信部分 */
+    setTimeout(() => {
+      try { this.fuseBurn.stop(); } catch (e) { /* ignore */ }
+    }, 2000);
+  }
+
+  /* 火箭飞行音效 */
+  playRocketFly() {
+    this.rocketFly.stop();
+    this.rocketFly.play();
+  }
+
+  stopRocketFly() {
+    this.rocketFly.stop();
+  }
+
   /* 停止所有音效 */
   stopAll() {
     this.stopBgm();
@@ -112,5 +139,7 @@ export default class Sound {
     this.shieldBreak.stop();
     this.shieldPickup.stop();
     this.scoreX2.stop();
+    this.fuseBurn.stop();
+    this.rocketFly.stop();
   }
 }

@@ -104,10 +104,12 @@ export default class Player extends Animation {
       const db = GameGlobal.databus;
       if (db.invincibleTimer > 0) return;  /* 无敌中，忽略 */
       db.lives--;
+      GameGlobal.sound.playHit();
       console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
       if (db.lives <= 0) {
         this.destroy();
         db.gameOver();
+        GameGlobal.sound.playDie();
       } else {
         db.invincibleTimer = PLAYER.INVINCIBLE_DURATION;
         /* 复活到屏幕中央偏上 */

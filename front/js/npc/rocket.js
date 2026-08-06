@@ -49,6 +49,11 @@ export default class Rocket extends Sprite {
     this._trackedX = player.x;
     this._trackedY = player.y;
 
+    /* 播放引信点燃音效 */
+    if (GameGlobal.sound) {
+      GameGlobal.sound.playFuseBurn();
+    }
+
     console.log(`[Rocket] 追踪阶段开始 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} trackTimer=${this.trackTimer}`);
   }
 
@@ -75,6 +80,12 @@ export default class Rocket extends Sprite {
         this.targetX = this._trackedX;
         this.targetY = this._trackedY;
         this.angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
+
+        /* 播放火箭飞行音效 */
+        if (GameGlobal.sound) {
+          GameGlobal.sound.playRocketFly();
+        }
+
         console.log(`[Rocket] 锁定发射! target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}°`);
       }
       return;
@@ -159,5 +170,12 @@ export default class Rocket extends Sprite {
     const rh = this.height - 4;
 
     return bx + bw > rx && bx < rx + rw && by + bh > ry && by < ry + rh;
+  }
+
+  /* 火箭移除时清理音效 */
+  cleanup() {
+    if (GameGlobal.sound) {
+      GameGlobal.sound.stopRocketFly();
+    }
   }
 }

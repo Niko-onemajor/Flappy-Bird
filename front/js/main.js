@@ -55,10 +55,10 @@ const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
 const ROCKET_COOLDOWN = 40;  /* 火箭生成冷却帧数（0.67秒），缩短间隔保证稳定出现 */
 
 /* 碰撞箱可视化调试开关 */
-GameGlobal.DEBUG_COLLISION = true;
+GameGlobal.DEBUG_COLLISION = false;
 
 /* 调试模式：启动后分数直接跳到25，方便测试火箭 */
-GameGlobal.DEBUG_SKIP_SCORE = true;
+GameGlobal.DEBUG_SKIP_SCORE = false;
 
 /**
  * 本地游戏主循环 —— 游戏逻辑在本地运行，彻底消除网络延迟。
@@ -245,6 +245,7 @@ export default class Main {
     /* 游戏结束处理 */
     if (this.databus.isGameOver) {
       GameGlobal.isGameOverServer = true;
+      GameGlobal.sound.stopRocketFly();
       if (!this._playedDieSound) {
         this._playedDieSound = true;
         GameGlobal.sound.playHit();
@@ -452,6 +453,7 @@ export default class Main {
       rocket.update();
       if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 30
           || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
+        rocket.cleanup();
         this.databus.rockets.splice(i, 1);
         this.databus.pool.recover('rocket', rocket);
       }
@@ -502,6 +504,7 @@ export default class Main {
       if (rocket.isCollideWithBird(this.player)) {
         if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
+          rocket.cleanup();
           this.databus.rockets.splice(i, 1);
           this.databus.pool.recover('rocket', rocket);
           this.databus.shieldActive = false;
