@@ -380,27 +380,21 @@ export default class Main {
 
     console.log(`[Rocket] frame=${frame} 冷却完毕! 尝试生成 score=${score} rockets=${this.databus.rockets.length}/${maxRockets}`);
 
-    const effectiveChance = GameGlobal.DEBUG_SKIP_SCORE ? 1.0 : ROCKET_SPAWN_CHANCE;
-    const roll = Math.random();
-    console.log(`[Rocket] frame=${frame} 概率判定 roll=${roll.toFixed(3)} chance=${effectiveChance.toFixed(2)} ${roll < effectiveChance ? '✓命中' : '✗未命中'}`);
-
-    if (roll < effectiveChance) {
-      const { speed } = this._getDifficulty();
-      const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
-      if (!rocket) {
-        console.error(`[Rocket] frame=${frame} 对象池获取失败!`);
-        this.rocketTimer = 10;
-        return;
-      }
-      try {
-        rocket.init(speed);
-        this.databus.rockets.push(rocket);
-        console.log(`[Rocket] frame=${frame} 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
-      } catch (e) {
-        console.error(`[Rocket] frame=${frame} init崩溃:`, e);
-        this.rocketTimer = 10;
-        return;
-      }
+    const { speed } = this._getDifficulty();
+    const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
+    if (!rocket) {
+      console.error(`[Rocket] frame=${frame} 对象池获取失败!`);
+      this.rocketTimer = 10;
+      return;
+    }
+    try {
+      rocket.init(speed);
+      this.databus.rockets.push(rocket);
+      console.log(`[Rocket] frame=${frame} 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
+    } catch (e) {
+      console.error(`[Rocket] frame=${frame} init崩溃:`, e);
+      this.rocketTimer = 10;
+      return;
     }
 
     this.rocketTimer = cooldown;
