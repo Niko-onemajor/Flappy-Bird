@@ -340,11 +340,11 @@ export default class Main {
     this.databus.rockets.push(rocket);
   }
 
-  /* 火箭难度等级：每6分提升一级，数量+1、冷却缩短 */
+  /* 火箭难度等级：每8分提升一级，最大3个，冷却从150帧缓慢缩短 */
   _getRocketLevel(score) {
-    const level = Math.floor((score - ROCKET_MIN_SCORE) / 6) + 1;
-    const maxRockets = Math.min(level, 6);
-    const cooldown = Math.max(90 - (level - 1) * 20, 30)
+    const level = Math.floor((score - ROCKET_MIN_SCORE) / 8) + 1;
+    const maxRockets = Math.min(level, 3);
+    const cooldown = Math.max(150 - (level - 1) * 20, 60)
       + Math.floor(Math.random() * 20);
     return { level, maxRockets, cooldown };
   }

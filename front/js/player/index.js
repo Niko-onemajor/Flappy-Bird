@@ -150,10 +150,7 @@ export default class Player extends Animation {
 
     ctx.restore();
 
-    /* Buff图标 */
-    if (db.shieldActive) {
-      this._renderShieldIcon(ctx, cx, cy);
-    }
+    /* Buff图标（仅保留x2分数图标，移除小盾牌） */
     if (db.scoreMultiplier > 1) {
       this._renderMultiplierIcon(ctx, cx, cy);
     }
