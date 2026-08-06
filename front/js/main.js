@@ -287,21 +287,24 @@ export default class Main {
     this.pipeTimer = Math.max(interval, 30);  /* 保底最小值，防止过于接近0 */
     console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
 
-    /* 道具生成：基于刚生成的水管（propTimer已由_updateTimers每帧递减） */
+    /* 道具生成：基于刚生成的水管 */
     this._pipesSinceLastProp++;
-    const forceProp = this._pipesSinceLastProp >= 5;  /* 每5根水管保底出一次 */
-    if (forceProp) {
-      console.log(`[Prop] 保底触发! pipesSinceLastProp=${this._pipesSinceLastProp}`);
-    }
-    if (this.propTimer <= 0 && (forceProp || Math.random() < propChance)
-        && this.databus.props.length < 3) {
+
+    /* 保底机制：每5根水管必出（不受冷却限制） */
+    if (this._pipesSinceLastProp >= 5 && this.databus.props.length < 3) {
       this._createPropForPipe(pipe);
       this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
       this._pipesSinceLastProp = 0;
-      console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}${forceProp ? ' (保底)' : ''}`);
+      console.log(`[Prop] 保底生成 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
+    }
+    /* 随机生成：冷却结束后概率触发 */
+    else if (this.propTimer <= 0 && Math.random() < propChance && this.databus.props.length < 3) {
+      this._createPropForPipe(pipe);
+      this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
+      this._pipesSinceLastProp = 0;
+      console.log(`[Prop] 随机生成 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
     } else if (this.propTimer <= 0) {
       this.propTimer = 30;  /* 概率未命中，0.5秒后重试 */
-      console.log(`[Prop] 跳过 chance=${propChance.toFixed(2)} props=${this.databus.props.length} 重试timer=${this.propTimer}`);
     }
 
     /* 锯片（8分后）：基于刚生成的水管，pipe已通过init校验 */
