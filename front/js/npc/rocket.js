@@ -176,6 +176,7 @@ export default class Rocket extends Sprite {
   cleanup() {
     if (GameGlobal.sound) {
       GameGlobal.sound.stopRocketFly();
+      GameGlobal.sound.stopFuseBurn();
     }
   }
 }

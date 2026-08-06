@@ -135,6 +135,11 @@ export default class Sound {
     this._rocketFlyPlaying = false;
   }
 
+  stopFuseBurn() {
+    this.fuseBurn.stop();
+    this._fuseBurnPlaying = false;
+  }
+
   /* 停止所有音效 */
   stopAll() {
     this.stopBgm();
