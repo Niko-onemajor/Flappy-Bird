@@ -223,6 +223,7 @@ export default class Main {
     this._checkCollisions();
     this._updateTimers();
     this._generatePipes();
+    this._tryGenerateRocket();  /* 每帧检查，独立于水管生成 */
 
     /* 检测得分（通过水管） */
     for (const pipe of this.databus.pipes) {
@@ -293,9 +294,6 @@ export default class Main {
       this._createSawForPipe(pipe, speed);
       console.log(`[Saw] 触发 score=${this.databus.score} saws=${this.databus.saws.length}`);
     }
-
-    /* 火箭（20分后）：使用独立冷却计时器，不依赖水管生成时机 */
-    this._tryGenerateRocket(speed);
   }
 
   _createPropForPipe(pipe) {
@@ -323,17 +321,18 @@ export default class Main {
   }
 
   _createRocketForPipe(pipe, pipeSpeed) {
+    /* 保留兼容，新火箭不再需要 pipe 参数 */
     if (!pipe || pipe.gapY == null || pipe.gap == null) {
       console.warn('[Rocket] 跳过生成：水管对象无效', pipe);
       return;
     }
     const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
-    rocket.init(pipeSpeed, pipe);
+    rocket.init(pipeSpeed);
     this.databus.rockets.push(rocket);
   }
 
-  /* 火箭独立生成逻辑：使用专用冷却计时器，每ROCKET_COOLDOWN帧尝试一次 */
-  _tryGenerateRocket(pipeSpeed) {
+  /* 火箭独立生成：每帧调用，20分后开始，从右侧进入，2秒追踪后锁定发射 */
+  _tryGenerateRocket() {
     if (this.databus.score < ROCKET_MIN_SCORE) return;
     if (this.databus.rockets.length >= 6) return;
 
@@ -341,18 +340,14 @@ export default class Main {
     if (this.rocketTimer > 0) return;
 
     if (Math.random() < ROCKET_SPAWN_CHANCE) {
-      /* 选取最近生成的水管来定位火箭Y坐标 */
-      const pipes = this.databus.pipes;
-      if (pipes.length === 0) {
-        this.rocketTimer = 10;
-        return;
-      }
-      const refPipe = pipes[pipes.length - 1];
-      this._createRocketForPipe(refPipe, pipeSpeed);
-      console.log(`[Rocket] 触发(独立计时器) score=${this.databus.score} rockets=${this.databus.rockets.length}`);
+      const { speed } = this._getDifficulty();
+      const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
+      rocket.init(speed);
+      this.databus.rockets.push(rocket);
+      console.log(`[Rocket] 生成(每帧) score=${this.databus.score} speed=${speed.toFixed(1)} rockets=${this.databus.rockets.length}`);
     }
 
-    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 30);
+    this.rocketTimer = ROCKET_COOLDOWN + Math.floor(Math.random() * 60);
   }
 
   _updatePipes() {

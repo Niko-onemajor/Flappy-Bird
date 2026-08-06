@@ -4,8 +4,9 @@ import { GROUND, ROCKET as ROCKET_CFG } from '../config';
 
 const ROCKET_W = ROCKET_CFG.WIDTH;
 const ROCKET_H = ROCKET_CFG.HEIGHT;
+const TRACK_DURATION = 120;  /* 追踪阶段：120帧 = 2秒 */
 
-/* 预加载火箭图片（与 pipe 同款模块级 IIFE，游戏启动时即加载） */
+/* 预加载火箭图片 */
 const ROCKET_IMG = (() => { const img = wx.createImage(); img.src = 'images/rocket.png'; return img; })();
 
 export default class Rocket extends Sprite {
@@ -14,65 +15,66 @@ export default class Rocket extends Sprite {
   angle = 0;
   targetX = 0;
   targetY = 0;
+  state = 'tracking';    /* tracking | flying */
+  trackTimer = 0;        /* 追踪剩余帧数 */
+  _trackedX = 0;         /* 追踪到的玩家X */
+  _trackedY = 0;         /* 追踪到的玩家Y */
 
   constructor() {
     super('', ROCKET_W, ROCKET_H);
   }
 
-  init(pipeSpeed, pipe) {
+  /* 简化版 init：不需要 pipe 参数，从右侧随机Y进入 */
+  init(pipeSpeed) {
     this.visible = true;
     this.isActive = true;
     this.speed = pipeSpeed * 1.2;
     this.trailPhase = 0;
-    this.x = SCREEN_WIDTH + 40 + Math.random() * 60;
+    this.state = 'tracking';
+    this.trackTimer = TRACK_DURATION;
 
-    this.y = this._calcY(pipe);
-
-    const player = GameGlobal.databus.player;
-    this.targetX = player.x;
-    this.targetY = player.y;
-    this.angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
-
-    console.log(`[Rocket] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}° speed=${this.speed.toFixed(1)}`);
-  }
-
-  _calcY(pipe) {
+    /* 从屏幕右侧进入，随机Y（避开天花板和地面） */
+    this.x = SCREEN_WIDTH + 30 + Math.random() * 50;
     const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
-    const safeTop = 30;
-    const safeBottom = availableH - ROCKET_H - 10;
-    const margin = 8;
+    this.y = 40 + Math.random() * (availableH - ROCKET_H - 40);
 
-    const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
-    const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
+    /* 记录玩家初始位置 */
+    const player = GameGlobal.databus.player;
+    this._trackedX = player.x;
+    this._trackedY = player.y;
 
-    if (hasTop && hasBottom) {
-      /* 双管：火箭放在间隙上方或下方，不堵死通路 */
-      if (Math.random() < 0.5) {
-        const y = pipe.gapY - ROCKET_H - margin;
-        return Math.max(safeTop, y);
-      } else {
-        const y = pipe.gapY + pipe.gap + margin;
-        return Math.min(safeBottom, y);
-      }
-    }
-
-    if (hasBottom) {
-      /* 只有下管：唯一通路在上方，火箭放在下管上方 */
-      const y = pipe.gapY - ROCKET_H - margin;
-      return Math.max(safeTop, y);
-    }
-
-    if (hasTop) {
-      /* 只有上管：唯一通路在下方，火箭放在上管下方 */
-      const y = pipe.gapY + margin;
-      return Math.min(safeBottom, y);
-    }
-
-    return availableH / 2;
+    console.log(`[Rocket] 追踪阶段开始 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} trackTimer=${this.trackTimer}`);
   }
 
   update() {
     if (GameGlobal.databus.isGameOver) return;
+
+    if (this.state === 'tracking') {
+      /* 追踪阶段：从右侧缓慢进入，持续追踪玩家位置 */
+      this.x -= this.speed * 0.3;  /* 缓慢进入屏幕 */
+      this.trackTimer--;
+      this.trailPhase += 0.05;
+
+      /* 持续更新追踪到的玩家位置 */
+      const player = GameGlobal.databus.player;
+      this._trackedX = player.x;
+      this._trackedY = player.y;
+
+      /* 追踪阶段：火箭头始终指向玩家 */
+      this.angle = Math.atan2(this._trackedY - this.y, this._trackedX - this.x);
+
+      if (this.trackTimer <= 0) {
+        /* 追踪结束，锁定最后位置，全速发射 */
+        this.state = 'flying';
+        this.targetX = this._trackedX;
+        this.targetY = this._trackedY;
+        this.angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
+        console.log(`[Rocket] 锁定发射! target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}°`);
+      }
+      return;
+    }
+
+    /* 飞行阶段：直线飞向锁定位置 */
     this.x += Math.cos(this.angle) * this.speed;
     this.y += Math.sin(this.angle) * this.speed;
     this.trailPhase += 0.15;
@@ -98,13 +100,32 @@ export default class Rocket extends Sprite {
 
     ctx.restore();
 
+    /* 追踪阶段：显示警告标识 */
+    if (this.state === 'tracking') {
+      const warnAlpha = 0.3 + 0.3 * Math.sin(this.trailPhase * 3);
+      ctx.strokeStyle = `rgba(255, 60, 30, ${warnAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, this.width * 0.8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      /* 倒计时文字 */
+      const sec = Math.ceil(this.trackTimer / 60);
+      ctx.fillStyle = `rgba(255, 255, 255, ${warnAlpha + 0.2})`;
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${sec}`, cx, cy - this.height / 2 - 8);
+    }
+
     /* 碰撞箱可视化（黄色AABB） */
     if (GameGlobal.DEBUG_COLLISION) {
       const rx = this.x + 4;
       const ry = this.y + 2;
       const rw = this.width - 8;
       const rh = this.height - 4;
-      ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+      ctx.strokeStyle = this.state === 'tracking' ? 'rgba(255, 165, 0, 0.8)' : 'rgba(255, 255, 0, 0.8)';
       ctx.lineWidth = 2;
       ctx.strokeRect(rx, ry, rw, rh);
       /* 方向指示线 */
