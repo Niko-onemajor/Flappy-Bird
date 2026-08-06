@@ -9,6 +9,9 @@ const FLOAT_AMP = PROP.FLOAT_AMP;
 const FLOAT_SPEED = PROP.FLOAT_SPEED;
 const PIPE_SAFE_MARGIN = PROP.SAFE_MARGIN;
 
+/* 预加载道具图片 */
+const SHIELD_IMG = (() => { const img = wx.createImage(); img.src = 'images/shield.png'; return img; })();
+
 /* 道具外观配置 */
 const PROP_STYLE = {
   shield: {
@@ -16,12 +19,14 @@ const PROP_STYLE = {
     glow: '#FFA000',
     icon: '🛡',
     name: '护盾',
+    img: SHIELD_IMG,
   },
   multiplier: {
     color: '#FF5252',
     glow: '#D32F2F',
     icon: 'x2',
     name: '双倍',
+    img: null,
   },
 };
 
@@ -131,35 +136,44 @@ export default class Prop extends Sprite {
     ctx.arc(cx, cy, outerR + 4, 0, Math.PI * 2);
     ctx.fill();
 
-    /* 主体圆形 */
-    const mainGrad = ctx.createRadialGradient(cx - 3, cy - 3, r * 0.1, cx, cy, r * pulse);
-    mainGrad.addColorStop(0, '#ffffff');
-    mainGrad.addColorStop(0.4, style.color);
-    mainGrad.addColorStop(1, style.glow);
-    ctx.fillStyle = mainGrad;
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
-    ctx.fill();
+    if (style.img) {
+      /* 使用图片素材 */
+      ctx.shadowBlur = 10;
+      const imgR = r * pulse * 1.2;
+      ctx.drawImage(style.img, cx - imgR, cy - imgR, imgR * 2, imgR * 2);
+    } else {
+      /* 主体圆形 */
+      const mainGrad = ctx.createRadialGradient(cx - 3, cy - 3, r * 0.1, cx, cy, r * pulse);
+      mainGrad.addColorStop(0, '#ffffff');
+      mainGrad.addColorStop(0.4, style.color);
+      mainGrad.addColorStop(1, style.glow);
+      ctx.fillStyle = mainGrad;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+      ctx.fill();
 
-    /* 边框 */
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
-    ctx.stroke();
+      /* 边框 */
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+      ctx.stroke();
 
-    /* 图标 */
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(style.icon, cx, cy);
+      /* 图标 */
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(style.icon, cx, cy);
+    }
 
     /* 名称标签 */
+    ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.font = 'bold 9px Arial';
+    ctx.textAlign = 'center';
     ctx.fillText(style.name, cx, cy + r + 10);
 
     ctx.restore();

@@ -44,6 +44,14 @@ export default class Sound {
     this.bgm.stop();
   }
 
+  pauseBgm() {
+    this.bgm.pause();
+  }
+
+  resumeBgm() {
+    this.bgm.play();
+  }
+
   playWing() {
     this.wing.stop();
     this.wing.play();

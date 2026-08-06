@@ -7,8 +7,10 @@ import Sound from './sound';
 import Player from './player/index';
 import Pipe from './npc/pipe';
 import Prop from './npc/prop';
+import Saw from './npc/saw';
+import Rocket from './npc/rocket';
 import DataBus from './databus';
-import { PLAYER, GROUND, PIPE, PROP as PROP_CFG } from './config';
+import { PLAYER, GROUND, PIPE, PROP as PROP_CFG, SAW as SAW_CFG, ROCKET as ROCKET_CFG } from './config';
 
 const ctx = canvas.getContext('2d');
 
@@ -19,6 +21,8 @@ const SCREEN_STATE = {
   HOME: 'home',
   READY: 'ready',
   PLAYING: 'playing',
+  PAUSED: 'paused',
+  COUNTDOWN: 'countdown',
   LEADERBOARD: 'leaderboard',
 };
 
@@ -43,6 +47,11 @@ const PROP_TYPES = ['shield', 'multiplier'];
 const MIN_SPACING = PIPE.MIN_SPACING;
 const MOVE_RANGE = PIPE.MOVE_RANGE;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
+const SHIELD_COOLDOWN = PROP_CFG.SHIELD_COOLDOWN;
+const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
+const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
+const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
+const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
 
 /**
  * 本地游戏主循环 —— 游戏逻辑在本地运行，彻底消除网络延迟。
@@ -61,6 +70,8 @@ export default class Main {
   _scoreSubmitted = false;
   _playedDieSound = false;
   _prevScore = 0;
+  _countdownTimer = 0;       /* 暂停恢复倒计时 */
+  _countdownStart = 0;       /* 倒计时开始帧 */
 
   constructor() {
     this.player = new Player();
@@ -69,6 +80,9 @@ export default class Main {
     this.gameInfo.on('backToHome', this.goToHome.bind(this));
     this.gameInfo.on('flap', this.flap.bind(this));
     this.gameInfo.on('showLeaderboard', this.showLeaderboard.bind(this));
+    this.gameInfo.on('pause', this.pauseGame.bind(this));
+    this.gameInfo.on('resume', this.resumeGame.bind(this));
+    this.gameInfo.on('quitToHome', this.goToHome.bind(this));
 
     /* 初始化全局屏幕状态（必须在注册触摸事件后、loop 前设置） */
     GameGlobal.screenState = SCREEN_STATE.HOME;
@@ -134,6 +148,23 @@ export default class Main {
     }
   }
 
+  /* ========== 暂停/恢复 ========== */
+  pauseGame() {
+    if (this.screenState !== SCREEN_STATE.PLAYING) return;
+    this.screenState = SCREEN_STATE.PAUSED;
+    GameGlobal.screenState = SCREEN_STATE.PAUSED;
+    GameGlobal.sound.pauseBgm();
+  }
+
+  resumeGame() {
+    if (this.screenState !== SCREEN_STATE.PAUSED) return;
+    /* 开始3秒倒计时 */
+    this.screenState = SCREEN_STATE.COUNTDOWN;
+    GameGlobal.screenState = SCREEN_STATE.COUNTDOWN;
+    this._countdownTimer = 180;  /* 3秒 = 180帧 */
+    this.gameInfo._countdownValue = 3;
+  }
+
   /* ========== 排行榜 ========== */
   async showLeaderboard() {
     this.screenState = SCREEN_STATE.LEADERBOARD;
@@ -161,9 +192,24 @@ export default class Main {
   /* ========== 本地游戏逻辑 ========== */
   tick() {
     this.databus.frame++;
+
+    /* 倒计时中：只更新倒计时，不更新游戏逻辑 */
+    if (this.screenState === SCREEN_STATE.COUNTDOWN) {
+      this._countdownTimer--;
+      this.gameInfo._countdownValue = Math.ceil(this._countdownTimer / 60);
+      if (this._countdownTimer <= 0) {
+        this.screenState = SCREEN_STATE.PLAYING;
+        GameGlobal.screenState = SCREEN_STATE.PLAYING;
+        GameGlobal.sound.resumeBgm();
+      }
+      return;
+    }
+
     this.player.update();
     this._updatePipes();
     this._updateProps();
+    this._updateSaws();
+    this._updateRockets();
     this._checkCollisions();
     this._updateTimers();
     this._generatePipes();
@@ -214,6 +260,16 @@ export default class Main {
     if (Math.random() < propChance) {
       this._createPropForPipe(pipe, speed);
     }
+
+    /* 概率生成锯片（20分后） */
+    if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE) {
+      this._createSawForPipe(pipe, speed);
+    }
+
+    /* 概率生成火箭（50分后） */
+    if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE) {
+      this._createRocketForPipe(pipe, speed);
+    }
   }
 
   _createPropForPipe(pipe, pipeSpeed) {
@@ -255,6 +311,18 @@ export default class Main {
     this.databus.props.push(prop);
   }
 
+  _createSawForPipe(pipe, pipeSpeed) {
+    const saw = this.databus.pool.getItemByClass('saw', Saw);
+    saw.init(pipeSpeed, pipe);
+    this.databus.saws.push(saw);
+  }
+
+  _createRocketForPipe(pipe, pipeSpeed) {
+    const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
+    rocket.init(pipeSpeed, pipe);
+    this.databus.rockets.push(rocket);
+  }
+
   _updatePipes() {
     for (let i = this.databus.pipes.length - 1; i >= 0; i--) {
       const pipe = this.databus.pipes[i];
@@ -292,6 +360,28 @@ export default class Main {
     }
   }
 
+  _updateSaws() {
+    for (let i = this.databus.saws.length - 1; i >= 0; i--) {
+      const saw = this.databus.saws[i];
+      saw.update();
+      if (saw.x + saw.width < -20) {
+        this.databus.saws.splice(i, 1);
+        this.databus.pool.recover('saw', saw);
+      }
+    }
+  }
+
+  _updateRockets() {
+    for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
+      const rocket = this.databus.rockets[i];
+      rocket.update();
+      if (rocket.x + rocket.width < -30) {
+        this.databus.rockets.splice(i, 1);
+        this.databus.pool.recover('rocket', rocket);
+      }
+    }
+  }
+
   _checkCollisions() {
     if (!this.player.isActive || !this.player.visible) return;
 
@@ -301,6 +391,42 @@ export default class Main {
       if (pipe.isCollideWithBird(this.player)) {
         if (this.databus.shieldActive) {
           this.databus.removePipe(pipe);
+          this.databus.shieldActive = false;
+          this.databus.shieldTimer = 0;
+          continue;
+        }
+        this.player.destroy();
+        this.databus.gameOver();
+        return;
+      }
+    }
+
+    /* 锯片碰撞 */
+    for (let i = this.databus.saws.length - 1; i >= 0; i--) {
+      const saw = this.databus.saws[i];
+      if (saw.isCollideWithBird(this.player)) {
+        if (this.databus.shieldActive) {
+          this.databus.saws.splice(i, 1);
+          this.databus.pool.recover('saw', saw);
+          this.databus.shieldActive = false;
+          this.databus.shieldTimer = 0;
+          continue;
+        }
+        this.player.destroy();
+        this.databus.gameOver();
+        return;
+      }
+    }
+
+    /* 火箭碰撞 */
+    for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
+      const rocket = this.databus.rockets[i];
+      if (rocket.isCollideWithBird(this.player)) {
+        if (this.databus.shieldActive) {
+          this.databus.rockets.splice(i, 1);
+          this.databus.pool.recover('rocket', rocket);
+          this.databus.shieldActive = false;
+          this.databus.shieldTimer = 0;
           continue;
         }
         this.player.destroy();
@@ -314,6 +440,8 @@ export default class Main {
       const prop = this.databus.props[i];
       if (prop.collected) continue;
       if (this._isPropCollideWithPlayer(prop)) {
+        /* 护盾冷却中不能拾取 */
+        if (prop.type === 'shield' && this.databus.shieldCooldown > 0) continue;
         prop.collect();
       }
     }
@@ -332,7 +460,13 @@ export default class Main {
   _updateTimers() {
     if (this.databus.shieldActive) {
       this.databus.shieldTimer--;
-      if (this.databus.shieldTimer <= 0) this.databus.shieldActive = false;
+      if (this.databus.shieldTimer <= 0) {
+        this.databus.shieldActive = false;
+        this.databus.shieldCooldown = SHIELD_COOLDOWN;  /* 开始冷却 */
+      }
+    }
+    if (this.databus.shieldCooldown > 0) {
+      this.databus.shieldCooldown--;
     }
     if (this.databus.scoreMultiplier > 1) {
       this.databus.multiplierTimer--;
@@ -354,12 +488,34 @@ export default class Main {
       this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
+      this.databus.saws.forEach((s) => s.render(ctx));
+      this.databus.rockets.forEach((r) => r.render(ctx));
       this.player.render(ctx);
       this.gameInfo.renderReady(ctx);
+    } else if (this.screenState === SCREEN_STATE.PAUSED) {
+      this.bg.render(ctx);
+      this.databus.pipes.forEach((p) => p.render(ctx));
+      this.databus.props.forEach((p) => p.render(ctx));
+      this.databus.saws.forEach((s) => s.render(ctx));
+      this.databus.rockets.forEach((r) => r.render(ctx));
+      this.player.render(ctx);
+      this.gameInfo.renderLocal(ctx, this.databus);
+      this.gameInfo.renderPauseOverlay(ctx);
+    } else if (this.screenState === SCREEN_STATE.COUNTDOWN) {
+      this.bg.render(ctx);
+      this.databus.pipes.forEach((p) => p.render(ctx));
+      this.databus.props.forEach((p) => p.render(ctx));
+      this.databus.saws.forEach((s) => s.render(ctx));
+      this.databus.rockets.forEach((r) => r.render(ctx));
+      this.player.render(ctx);
+      this.gameInfo.renderLocal(ctx, this.databus);
+      this.gameInfo.renderCountdown(ctx);
     } else {
       this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
+      this.databus.saws.forEach((s) => s.render(ctx));
+      this.databus.rockets.forEach((r) => r.render(ctx));
       this.player.render(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
     }
@@ -369,7 +525,7 @@ export default class Main {
   loop() {
     this.bg.update();
 
-    if (this.screenState === SCREEN_STATE.PLAYING) {
+    if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
       this.tick();
     }
 

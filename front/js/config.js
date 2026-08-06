@@ -46,13 +46,30 @@ export const DIFFICULTY = {
 export const PROP = {
   SIZE: 32,
   SPEED: 3,
-  DURATION: 300,
+  DURATION: 180,       /* 护盾/双倍持续时间（帧，60fps=3秒） */
+  SHIELD_COOLDOWN: 180, /* 护盾冷却时间（帧，防止无限续盾） */
   FLOAT_AMP: 4,
   FLOAT_SPEED: 0.06,
   SAFE_MARGIN: 24,
   INTERVAL_BASE: 180,
   INTERVAL_MIN: 120,
   INTERVAL_RANDOM: 40,
+};
+
+/* ========== 圆锯障碍物配置 ========== */
+export const SAW = {
+  RADIUS: 22,
+  MIN_SCORE: 20,       /* 20分后才出现 */
+  SPAWN_CHANCE: 0.25,  /* 每个水管25%概率附带锯片 */
+};
+
+/* ========== 火箭障碍物配置 ========== */
+export const ROCKET = {
+  WIDTH: 50,
+  HEIGHT: 24,
+  SPEED: 5,
+  MIN_SCORE: 50,       /* 50分后才出现 */
+  SPAWN_CHANCE: 0.2,   /* 每个水管20%概率附带火箭 */
 };
 
 /* ========== 玩家配置 ========== */

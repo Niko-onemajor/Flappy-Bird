@@ -35,6 +35,29 @@ export default class GameInfo extends Emitter {
     this._leaderboardScrollY = 0;    /* 排行榜滚动偏移 */
     this._leaderboardMaxScroll = 0;  /* 排行榜最大滚动量 */
     this._lastTouchY = 0;            /* 上一次触摸Y坐标（用于滑动） */
+    this._countdownValue = 0;        /* 倒计时秒数 */
+
+    /* 暂停按钮（右上角） */
+    this.pauseBtnArea = {
+      startX: SCREEN_WIDTH - 50,
+      startY: 8,
+      endX: SCREEN_WIDTH - 10,
+      endY: 42,
+    };
+
+    /* 暂停面板按钮 */
+    this.resumeBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 80,
+      startY: SCREEN_HEIGHT / 2 - 10,
+      endX: SCREEN_WIDTH / 2 + 80,
+      endY: SCREEN_HEIGHT / 2 + 30,
+    };
+    this.quitBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 80,
+      startY: SCREEN_HEIGHT / 2 + 40,
+      endX: SCREEN_WIDTH / 2 + 80,
+      endY: SCREEN_HEIGHT / 2 + 80,
+    };
 
     /* 游戏结束按钮 */
     this.btnArea = {
@@ -304,6 +327,11 @@ export default class GameInfo extends Emitter {
     /* 道具状态栏 */
     this.renderPropBar(ctx, databus);
 
+    /* 暂停按钮（游戏进行中且未结束时显示） */
+    if (!databus.isGameOver && GameGlobal.screenState === 'playing') {
+      this._renderPauseBtn(ctx);
+    }
+
     /* 游戏结束 */
     if (databus.isGameOver) {
       this.renderGameOver(ctx);
@@ -350,21 +378,57 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 道具状态栏 */
+  /* 道具状态栏 - 顶部进度条，更明显 */
   renderPropBar(ctx, db) {
-    const barY = SCREEN_HEIGHT - 15;
-    const barX = SCREEN_WIDTH / 2 - 60;
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
+    const barW = 140;
+    const barH = 10;
+    const barX = SCREEN_WIDTH / 2 - barW / 2;
+    const barY = 52;
 
     if (db.shieldActive) {
+      const pct = db.shieldTimer / 300;  /* 300 = 5秒参考值 */
+      /* 背景 */
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      this._roundRect(ctx, barX, barY, barW, barH, 5);
+      ctx.fill();
+      /* 进度 */
       ctx.fillStyle = '#FFD700';
-      ctx.fillText(`护盾 ${Math.ceil(db.shieldTimer / 60)}s`, barX, barY);
+      this._roundRect(ctx, barX, barY, barW * pct, barH, 5);
+      ctx.fill();
+      /* 文字 */
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`护盾 ${Math.ceil(db.shieldTimer / 60)}s`, SCREEN_WIDTH / 2, barY - 4);
     }
 
     if (db.scoreMultiplier > 1) {
+      const yOff = db.shieldActive ? 22 : 0;
+      const pct = db.multiplierTimer / 300;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
+      ctx.fill();
       ctx.fillStyle = '#FF5252';
-      ctx.fillText(`x2 ${Math.ceil(db.multiplierTimer / 60)}s`, barX + 80, barY);
+      this._roundRect(ctx, barX, barY + yOff, barW * pct, barH, 5);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px Arial';
+      ctx.fillText(`x2 ${Math.ceil(db.multiplierTimer / 60)}s`, SCREEN_WIDTH / 2, barY + yOff - 4);
+    }
+
+    /* 护盾冷却中 */
+    if (db.shieldCooldown > 0) {
+      const yOff = (db.shieldActive ? 22 : 0) + (db.scoreMultiplier > 1 ? 22 : 0);
+      const pct = db.shieldCooldown / 180;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(150, 150, 150, 0.6)';
+      this._roundRect(ctx, barX, barY + yOff, barW * pct, barH, 5);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.font = '10px Arial';
+      ctx.fillText(`护盾冷却 ${Math.ceil(db.shieldCooldown / 60)}s`, SCREEN_WIDTH / 2, barY + yOff - 4);
     }
   }
 
@@ -499,6 +563,76 @@ export default class GameInfo extends Emitter {
     ctx.fillText('返回主页', SCREEN_WIDTH / 2, (this.menuBtnArea.startY + this.menuBtnArea.endY) / 2);
   }
 
+  /* ========== 暂停按钮 ========== */
+  _renderPauseBtn(ctx) {
+    const btn = this.pauseBtnArea;
+    const w = btn.endX - btn.startX;
+    const h = btn.endY - btn.startY;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    this._roundRect(ctx, btn.startX, btn.startY, w, h, 6);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⏸', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2);
+  }
+
+  /* ========== 暂停面板 ========== */
+  renderPauseOverlay(ctx) {
+    /* 半透明遮罩 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 标题 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('游戏暂停', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60);
+
+    /* 继续按钮 */
+    const resBtn = this.resumeBtnArea;
+    ctx.fillStyle = '#4CAF50';
+    ctx.strokeStyle = '#2E7D32';
+    ctx.lineWidth = 3;
+    this._roundRect(ctx, resBtn.startX, resBtn.startY, resBtn.endX - resBtn.startX, resBtn.endY - resBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('继续游戏', (resBtn.startX + resBtn.endX) / 2, (resBtn.startY + resBtn.endY) / 2);
+
+    /* 结束按钮 */
+    const quitBtn = this.quitBtnArea;
+    ctx.fillStyle = '#f44336';
+    ctx.strokeStyle = '#B71C1C';
+    this._roundRect(ctx, quitBtn.startX, quitBtn.startY, quitBtn.endX - quitBtn.startX, quitBtn.endY - quitBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('结束游戏', (quitBtn.startX + quitBtn.endX) / 2, (quitBtn.startY + quitBtn.endY) / 2);
+  }
+
+  /* ========== 倒计时 ========== */
+  renderCountdown(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    const num = this._countdownValue;
+    /* 脉冲放大效果 */
+    const scale = 1 + Math.sin(Date.now() / 200) * 0.15;
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(String(num), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+    ctx.fillText(String(num), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+  }
+
   /* ========== 触摸事件 ========== */
   touchEventHandler(event) {
     if (!event.touches || event.touches.length === 0) return;
@@ -550,6 +684,19 @@ export default class GameInfo extends Emitter {
 
     /* 游戏中 / 准备中：点击屏幕任意位置 = 跳跃 */
     if (GameGlobal.screenState === 'playing' || GameGlobal.screenState === 'ready') {
+      /* 检查暂停按钮 */
+      if (GameGlobal.screenState === 'playing') {
+        if (
+          clientX >= this.pauseBtnArea.startX &&
+          clientX <= this.pauseBtnArea.endX &&
+          clientY >= this.pauseBtnArea.startY &&
+          clientY <= this.pauseBtnArea.endY
+        ) {
+          this.emit('pause');
+          return;
+        }
+      }
+
       /* 本地或服务端游戏结束状态 */
       const isOver = GameGlobal.isGameOverServer
         || (GameGlobal.databus && GameGlobal.databus.isGameOver);
@@ -577,6 +724,31 @@ export default class GameInfo extends Emitter {
       this.emit('flap');
       return;
     }
+
+    /* 暂停状态：点击继续或结束 */
+    if (GameGlobal.screenState === 'paused') {
+      if (
+        clientX >= this.resumeBtnArea.startX &&
+        clientX <= this.resumeBtnArea.endX &&
+        clientY >= this.resumeBtnArea.startY &&
+        clientY <= this.resumeBtnArea.endY
+      ) {
+        this.emit('resume');
+        return;
+      }
+      if (
+        clientX >= this.quitBtnArea.startX &&
+        clientX <= this.quitBtnArea.endX &&
+        clientY >= this.quitBtnArea.startY &&
+        clientY <= this.quitBtnArea.endY
+      ) {
+        this.emit('quitToHome');
+      }
+      return;
+    }
+
+    /* 倒计时中：忽略点击 */
+    if (GameGlobal.screenState === 'countdown') return;
 
     /* 游戏结束：点击按钮 */
     if (!GameGlobal.databus || !GameGlobal.databus.isGameOver) return;

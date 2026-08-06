@@ -8,6 +8,8 @@ let instance;
 export default class DataBus {
   pipes = [];          /* 水管障碍物数组 */
   props = [];          /* 道具数组 */
+  saws = [];           /* 圆锯障碍物数组 */
+  rockets = [];        /* 火箭障碍物数组 */
   animations = [];     /* 动画数组 */
   frame = 0;           /* 当前帧数 */
   score = 0;           /* 当前分数 */
@@ -17,6 +19,7 @@ export default class DataBus {
   /* 道具状态 */
   shieldActive = false;    /* 护盾是否激活 */
   shieldTimer = 0;         /* 护盾剩余时间 */
+  shieldCooldown = 0;      /* 护盾冷却时间（防止无限续盾） */
   scoreMultiplier = 1;     /* 分数倍率 */
   multiplierTimer = 0;     /* 倍率剩余时间 */
 
@@ -30,10 +33,13 @@ export default class DataBus {
     this.score = 0;
     this.pipes = [];
     this.props = [];
+    this.saws = [];
+    this.rockets = [];
     this.animations = [];
     this.isGameOver = false;
     this.shieldActive = false;
     this.shieldTimer = 0;
+    this.shieldCooldown = 0;
     this.scoreMultiplier = 1;
     this.multiplierTimer = 0;
   }
