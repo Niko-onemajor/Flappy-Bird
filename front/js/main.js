@@ -258,6 +258,11 @@ export default class Main {
 
     /* 先生成水管，再基于水管精确计算道具和障碍物坐标 */
     const pipe = this.databus.pool.getItemByClass('pipe', Pipe);
+    if (!pipe) {
+      console.warn('[Pipe] 对象池获取失败，延后生成');
+      this.pipeTimer = 10;
+      return;
+    }
     pipe.init(gap, speed);
     this.databus.pipes.push(pipe);
     this.pipeTimer = Math.max(interval, 30);  /* 保底最小值，防止过于接近0 */
@@ -275,14 +280,14 @@ export default class Main {
       console.log(`[Prop] 跳过 propTimer复归=${this.propTimer} props=${this.databus.props.length} chance=${propChance.toFixed(2)}`);
     }
 
-    /* 锯片（8分后）：基于刚生成的水管 */
+    /* 锯片（8分后）：基于刚生成的水管，pipe已通过init校验 */
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
       console.log(`[Saw] 触发 score=${this.databus.score} saws=${this.databus.saws.length}`);
     }
 
-    /* 火箭（20分后）：基于刚生成的水管 */
+    /* 火箭（20分后）：基于刚生成的水管，pipe已通过init校验 */
     if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
         && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
