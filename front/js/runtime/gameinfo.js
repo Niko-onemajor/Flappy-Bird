@@ -378,12 +378,12 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 道具状态栏 - 顶部进度条，更明显 */
+  /* 道具状态栏 - 显示在地面上方，避免遮挡玩家视角 */
   renderPropBar(ctx, db) {
     const barW = 140;
     const barH = 10;
     const barX = SCREEN_WIDTH / 2 - barW / 2;
-    const barY = 52;
+    const barY = SCREEN_HEIGHT - GROUND.HEIGHT - 14;  /* 地面上方14px */
 
     if (db.shieldActive) {
       const pct = db.shieldTimer / 300;  /* 300 = 5秒参考值 */
@@ -403,7 +403,7 @@ export default class GameInfo extends Emitter {
     }
 
     if (db.scoreMultiplier > 1) {
-      const yOff = db.shieldActive ? 22 : 0;
+      const yOff = db.shieldActive ? -22 : 0;
       const pct = db.multiplierTimer / 300;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
@@ -418,7 +418,7 @@ export default class GameInfo extends Emitter {
 
     /* 护盾冷却中 */
     if (db.shieldCooldown > 0) {
-      const yOff = (db.shieldActive ? 22 : 0) + (db.scoreMultiplier > 1 ? 22 : 0);
+      const yOff = (db.shieldActive ? -22 : 0) + (db.scoreMultiplier > 1 ? -22 : 0);
       const pct = db.shieldCooldown / 180;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
       this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
@@ -621,12 +621,15 @@ export default class GameInfo extends Emitter {
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     const num = this._countdownValue;
-    /* 脉冲放大效果 */
-    const scale = 1 + Math.sin(Date.now() / 200) * 0.15;
+    /* 使用帧计数器替代 Date.now()，避免真机系统调用开销 */
+    const phase = (GameGlobal.databus.frame % 120) / 120;
+    const scale = 1 + Math.sin(phase * Math.PI * 2) * 0.12;
+    const fontSize = Math.floor(72 * scale);
+
     ctx.fillStyle = '#FFD700';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 4;
-    ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
+    ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText(String(num), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);

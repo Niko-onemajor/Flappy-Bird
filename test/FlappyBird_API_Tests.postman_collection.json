@@ -1,0 +1,615 @@
+{
+  "info": {
+    "name": "Flappy Bird API 测试套件",
+    "description": "测试游戏核心API：开始游戏、帧推进、碰撞检测、道具系统、分数提交、排行榜",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 游戏会话管理",
+      "item": [
+        {
+          "name": "1.1 开始新游戏",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('返回 sessionId', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.sessionId).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('sessionId', json.sessionId);",
+                  "});",
+                  "pm.test('返回玩家初始状态', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.player).to.be.an('object');",
+                  "  pm.expect(json.player.isActive).to.be.true;",
+                  "  pm.expect(json.player.visible).to.be.true;",
+                  "  pm.expect(json.player.x).to.be.a('number');",
+                  "  pm.expect(json.player.y).to.be.a('number');",
+                  "});",
+                  "pm.test('初始分数为0', () => {",
+                  "  pm.expect(pm.response.json().score).to.equal(0);",
+                  "});",
+                  "pm.test('游戏未结束', () => {",
+                  "  pm.expect(pm.response.json().isGameOver).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"screenWidth\": 375, \"screenHeight\": 667}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/game/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "start"]
+            }
+          }
+        },
+        {
+          "name": "1.2 获取游戏状态",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('返回完整游戏状态', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.sessionId).to.equal(pm.collectionVariables.get('sessionId'));",
+                  "  pm.expect(json.player).to.be.an('object');",
+                  "  pm.expect(json.pipes).to.be.an('array');",
+                  "  pm.expect(json.props).to.be.an('array');",
+                  "  pm.expect(json.score).to.be.a('number');",
+                  "  pm.expect(json.isGameOver).to.be.a('boolean');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/state",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "state"]
+            }
+          }
+        },
+        {
+          "name": "1.3 查询不存在的会话",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 404', () => pm.response.to.have.status(404));",
+                  "pm.test('返回错误信息', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/nonexistent/state",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "nonexistent", "state"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. 游戏核心逻辑",
+      "item": [
+        {
+          "name": "2.1 推进帧 - 水管生成",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('帧数递增', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.frame).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('水管在适当距离后生成', () => {",
+                  "  const json = pm.response.json();",
+                  "  if (json.pipes.length > 0) {",
+                  "    pm.expect(json.pipes[0].x).to.be.a('number');",
+                  "    pm.expect(json.pipes[0].gap).to.be.a('number');",
+                  "    pm.expect(json.pipes[0].type).to.be.within(0, 3);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        },
+        {
+          "name": "2.2 连续推进100帧",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('游戏未崩溃', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.frame).to.equal(100);",
+                  "  pm.expect(json.isGameOver).to.be.false;",
+                  "});",
+                  "pm.test('水管已生成', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.pipes.length).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('道具可能已生成', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.props).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        },
+        {
+          "name": "2.3 小鸟跳跃",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('FlapPending 被设置', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.player).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/flap",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "flap"]
+            }
+          }
+        },
+        {
+          "name": "2.4 跳跃后推进帧验证Y轴变化",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Vy为负值(向上)', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.player.vy).to.be.below(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. 碰撞检测验证",
+      "item": [
+        {
+          "name": "3.1 不操作→小鸟下落→撞地面死亡",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('小鸟下落到地面以下', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.player.y).to.be.greaterThan(500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        },
+        {
+          "name": "3.2 验证游戏结束状态",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('游戏已结束', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.isGameOver).to.be.true;",
+                  "  pm.expect(json.player.isActive).to.be.false;",
+                  "  pm.expect(json.player.visible).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. 道具系统验证",
+      "item": [
+        {
+          "name": "4.1 开始新游戏并推进到道具出现",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('propSessionId', json.sessionId);",
+                  "console.log('道具测试会话:', json.sessionId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"screenWidth\": 375, \"screenHeight\": 667}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/game/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "start"]
+            }
+          }
+        },
+        {
+          "name": "4.2 推进帧直到出现道具",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.props.length > 0) {",
+                  "  pm.test('道具类型合法', () => {",
+                  "    pm.expect(['shield', 'multiplier']).to.include(json.props[0].type);",
+                  "  });",
+                  "  pm.test('道具有位置信息', () => {",
+                  "    pm.expect(json.props[0].x).to.be.a('number');",
+                  "    pm.expect(json.props[0].y).to.be.a('number');",
+                  "  });",
+                  "  pm.test('道具未被收集', () => {",
+                  "    pm.expect(json.props[0].collected).to.be.false;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{propSessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{propSessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. 分数系统",
+      "item": [
+        {
+          "name": "5.1 提交分数",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('返回排行榜条目', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.id).to.be.a('number');",
+                  "  pm.expect(json.playerName).to.be.a('string');",
+                  "  pm.expect(json.score).to.be.a('number');",
+                  "  pm.expect(json.createdAt).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"playerName\": \"TestPlayer\", \"score\": 42}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        },
+        {
+          "name": "5.2 获取排行榜",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('返回数组', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "});",
+                  "pm.test('排行榜按分数降序', () => {",
+                  "  const json = pm.response.json();",
+                  "  if (json.length >= 2) {",
+                  "    for (let i = 1; i < json.length; i++) {",
+                  "      pm.expect(json[i-1].score).to.be.at.least(json[i].score);",
+                  "    }",
+                  "  }",
+                  "});",
+                  "pm.test('每条记录包含必要字段', () => {",
+                  "  const json = pm.response.json();",
+                  "  if (json.length > 0) {",
+                  "    pm.expect(json[0].playerName).to.be.a('string');",
+                  "    pm.expect(json[0].score).to.be.a('number');",
+                  "    pm.expect(json[0].createdAt).to.be.a('string');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/score?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"],
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "5.3 提交零分（边界测试）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('零分也被接受', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.score).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"playerName\": \"ZeroPlayer\", \"score\": 0}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. 难度曲线验证",
+      "item": [
+        {
+          "name": "6.1 开始新游戏并快速推进到高分",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('diffSessionId', json.sessionId);",
+                  "console.log('难度测试会话:', json.sessionId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"screenWidth\": 375, \"screenHeight\": 667}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/game/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "start"]
+            }
+          }
+        },
+        {
+          "name": "6.2 多次Flap+Tick模拟高分场景",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('高帧数下游戏未崩溃', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.isGameOver).to.be.a('boolean');",
+                  "  pm.expect(json.frame).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('水管正常生成', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.pipes).to.be.an('array');",
+                  "  if (json.pipes.length > 0) {",
+                  "    pm.expect(json.pipes[0].speed).to.be.a('number');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{diffSessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{diffSessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. 水管类型覆盖",
+      "item": [
+        {
+          "name": "7.1 开始新游戏并大量推进收集水管类型",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('typeSessionId', json.sessionId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"screenWidth\": 375, \"screenHeight\": 667}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/game/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "start"]
+            }
+          }
+        },
+        {
+          "name": "7.2 验证所有水管类型(0-Normal/1-TopOnly/2-BottomOnly/3-Moving)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const types = new Set(json.pipes.map(p => p.type));",
+                  "console.log('水管类型:', [...types]);",
+                  "pm.test('水管类型在0-3范围内', () => {",
+                  "  json.pipes.forEach(p => pm.expect(p.type).to.be.within(0, 3));",
+                  "});",
+                  "if (json.pipes.some(p => p.type === 3)) {",
+                  "  pm.test('移动水管有isMoving标记', () => {",
+                  "    const moving = json.pipes.find(p => p.type === 3);",
+                  "    pm.expect(moving.isMoving).to.be.true;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{typeSessionId}}/tick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{typeSessionId}}", "tick"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

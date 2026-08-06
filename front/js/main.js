@@ -84,6 +84,9 @@ export default class Main {
     this.gameInfo.on('resume', this.resumeGame.bind(this));
     this.gameInfo.on('quitToHome', this.goToHome.bind(this));
 
+    /* 预绑定 loop 函数，避免每帧创建新函数导致 GC 压力和动画循环重复 */
+    this._boundLoop = this.loop.bind(this);
+
     /* 初始化全局屏幕状态（必须在注册触摸事件后、loop 前设置） */
     GameGlobal.screenState = SCREEN_STATE.HOME;
     console.log('[Main] 初始化完成，屏幕状态:', GameGlobal.screenState);
@@ -109,7 +112,7 @@ export default class Main {
     this._scoreSubmitted = false;
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
+    this.aniId = requestAnimationFrame(this._boundLoop);
   }
 
   startGame() {
@@ -125,7 +128,7 @@ export default class Main {
     GameGlobal.screenState = SCREEN_STATE.READY;
     GameGlobal.sound.playBgm();
     cancelAnimationFrame(this.aniId);
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
+    this.aniId = requestAnimationFrame(this._boundLoop);
   }
 
   async restartGame() {
@@ -177,7 +180,7 @@ export default class Main {
       console.error('[Main] 获取排行榜失败:', err);
     }
     cancelAnimationFrame(this.aniId);
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
+    this.aniId = requestAnimationFrame(this._boundLoop);
   }
 
   async submitScoreToServer() {
@@ -205,6 +208,9 @@ export default class Main {
       return;
     }
 
+    /* 游戏结束后不再更新逻辑 */
+    if (this.databus.isGameOver) return;
+
     this.player.update();
     this._updatePipes();
     this._updateProps();
@@ -215,13 +221,11 @@ export default class Main {
     this._generatePipes();
 
     /* 检测得分（通过水管） */
-    if (!this.databus.isGameOver) {
-      for (const pipe of this.databus.pipes) {
-        if (!pipe.scored && pipe.x + PIPE_WIDTH < this.player.x) {
-          pipe.scored = true;
-          this.databus.score += this.databus.scoreMultiplier;
-          GameGlobal.sound.playPoint();
-        }
+    for (const pipe of this.databus.pipes) {
+      if (!pipe.scored && pipe.x + PIPE_WIDTH < this.player.x) {
+        pipe.scored = true;
+        this.databus.score += this.databus.scoreMultiplier;
+        GameGlobal.sound.playPoint();
       }
     }
 
@@ -261,13 +265,15 @@ export default class Main {
       this._createPropForPipe(pipe, speed);
     }
 
-    /* 概率生成锯片（20分后） */
-    if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE) {
+    /* 概率生成锯片（20分后），限制最大数量防止内存溢出 */
+    if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
+        && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
     }
 
-    /* 概率生成火箭（50分后） */
-    if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE) {
+    /* 概率生成火箭（50分后），限制最大数量防止内存溢出 */
+    if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
+        && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
     }
   }
@@ -530,6 +536,6 @@ export default class Main {
     }
 
     this.render();
-    this.aniId = requestAnimationFrame(this.loop.bind(this));
+    this.aniId = requestAnimationFrame(this._boundLoop);
   }
 }
