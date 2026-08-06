@@ -38,32 +38,34 @@ export default class Rocket extends Sprite {
 
   _calcY(pipe) {
     const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
-    const birdH = 24;
-    const minClearance = birdH * 2.5;
+    const safeTop = 30;
+    const safeBottom = availableH - ROCKET_H - 10;
+    const margin = 8;
 
     const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
     const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
 
     if (hasTop && hasBottom) {
-      const safeTop = pipe.gapY + minClearance;
-      const safeBottom = pipe.gapY + pipe.gap - minClearance;
-      if (safeBottom - safeTop < ROCKET_H) return safeTop;
-      return Math.random() < 0.5
-        ? safeTop + 10
-        : safeBottom - ROCKET_H - 10;
+      /* 双管：火箭放在间隙上方或下方，不堵死通路 */
+      if (Math.random() < 0.5) {
+        const y = pipe.gapY - ROCKET_H - margin;
+        return Math.max(safeTop, y);
+      } else {
+        const y = pipe.gapY + pipe.gap + margin;
+        return Math.min(safeBottom, y);
+      }
     }
 
     if (hasBottom) {
-      const maxY = pipe.gapY - ROCKET_H - minClearance;
-      if (maxY < 30) return Math.max(30, pipe.gapY - ROCKET_H - 4);
-      return 30 + Math.random() * Math.max(0, maxY - 30);
+      /* 只有下管：唯一通路在上方，火箭放在下管上方 */
+      const y = pipe.gapY - ROCKET_H - margin;
+      return Math.max(safeTop, y);
     }
 
     if (hasTop) {
-      const minY = pipe.gapY + minClearance;
-      const maxY = availableH - ROCKET_H - 10;
-      if (minY > maxY) return Math.min(maxY, pipe.gapY + 4);
-      return minY + Math.random() * (maxY - minY);
+      /* 只有上管：唯一通路在下方，火箭放在上管下方 */
+      const y = pipe.gapY + margin;
+      return Math.min(safeBottom, y);
     }
 
     return availableH / 2;

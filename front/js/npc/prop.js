@@ -8,6 +8,7 @@ const PROP_DURATION = PROP.DURATION;
 const FLOAT_AMP = PROP.FLOAT_AMP;
 const FLOAT_SPEED = PROP.FLOAT_SPEED;
 const PIPE_SAFE_MARGIN = PROP.SAFE_MARGIN;
+const PIPE_WIDTH = PIPE.WIDTH;
 
 /* 预加载道具图片 */
 const SHIELD_IMG = (() => { const img = wx.createImage(); img.src = 'images/shield.png'; return img; })();
@@ -40,66 +41,54 @@ export default class Prop extends Sprite {
     super('', PROP_SIZE, PROP_SIZE);
   }
 
-  init(type, pipes, pipeSpeed = 3) {
-    this.type = type || PROP_TYPES[Math.floor(Math.random() * PROP_TYPES.length)];
+  /* 先生成水管，再基于水管精确计算道具坐标 */
+  init(pipe) {
+    this.type = PROP_TYPES[Math.floor(Math.random() * PROP_TYPES.length)];
     this.visible = true;
     this.isActive = true;
     this.collected = false;
     this.animPhase = Math.random() * Math.PI * 2;
-    this.speed = pipeSpeed;
-    /* 固定X偏移，避免扎堆 */
-    this.x = SCREEN_WIDTH + 30;
+    this.speed = pipe.speed;
+    this._parentPipe = pipe;
 
-    /* 在水管间隙中找安全Y位置 */
-    this.y = this._findSafeY(pipes || []);
+    /* 第一步：先确定X —— 放在水管正中央 */
+    this.x = pipe.x + PIPE_WIDTH / 2 - PROP_SIZE / 2;
+
+    /* 第二步：基于水管精确计算Y —— 确保在玩家必经之路上 */
+    this.y = this._findSafeY(pipe);
+
+    console.log(`[Prop] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} type=${this.type} pipeType=${pipe.pipeType} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap}`);
   }
 
-  /* 找到最近水管的间隙中心放置道具，确保玩家必经之路可拾取 */
-  _findSafeY(pipes) {
+  /* 基于水管位置精确计算道具Y坐标，确保玩家可拾取且不堵死通路 */
+  _findSafeY(pipe) {
     const safeTop = 50;
     const safeBottom = SCREEN_HEIGHT - GROUND.HEIGHT - 30;
 
-    /* 找到距离道具最近的水管（该水管即是玩家即将通过的） */
-    let bestPipe = null;
-    let bestDist = Infinity;
+    const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
+    const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
 
-    for (const pipe of pipes) {
-      if (!pipe.visible) continue;
-      const dist = Math.abs(pipe.x - this.x);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestPipe = pipe;
-      }
+    if (hasTop && hasBottom) {
+      /* 双管：放在间隙正中央，玩家必经之路 */
+      const gapCenter = pipe.gapY + pipe.gap / 2;
+      const y = Math.max(safeTop + PROP_SIZE, Math.min(gapCenter, safeBottom - PROP_SIZE));
+      console.log(`[Prop] 双管间隙中心=${gapCenter.toFixed(1)}, 最终y=${y.toFixed(1)}`);
+      return y;
+    } else if (hasBottom) {
+      /* 只有下管：放在下管上方安全区域，不堵死上方通路 */
+      const y = Math.max(safeTop + PROP_SIZE, pipe.gapY - PIPE_SAFE_MARGIN - PROP_SIZE);
+      console.log(`[Prop] 下管上方, y=${y.toFixed(1)}`);
+      return y;
+    } else if (hasTop) {
+      /* 只有上管：放在上管下方安全区域，不堵死下方通路 */
+      const y = Math.min(safeBottom - PROP_SIZE, pipe.gapY + PIPE_SAFE_MARGIN + PROP_SIZE);
+      console.log(`[Prop] 上管下方, y=${y.toFixed(1)}`);
+      return y;
     }
 
-    if (bestPipe) {
-      const hasTop = bestPipe.pipeType === 0 || bestPipe.pipeType === 1 || bestPipe.pipeType === 3;
-      const hasBottom = bestPipe.pipeType === 0 || bestPipe.pipeType === 2 || bestPipe.pipeType === 3;
-
-      console.log(`[道具生成] 匹配水管 type=${bestPipe.pipeType} x=${bestPipe.x.toFixed(1)} dist=${bestDist.toFixed(1)} gapY=${bestPipe.gapY.toFixed(1)} gap=${bestPipe.gap}`);
-
-      if (hasTop && hasBottom) {
-        /* 双管：放在间隙正中央，玩家必经之路 */
-        const gapCenter = bestPipe.gapY + bestPipe.gap / 2;
-        const y = Math.max(safeTop + PROP_SIZE, Math.min(gapCenter, safeBottom - PROP_SIZE));
-        console.log(`[道具生成] 双管间隙中心=${gapCenter.toFixed(1)}, 最终y=${y.toFixed(1)}`);
-        return y;
-      } else if (hasBottom) {
-        /* 只有下管：放在下管上方安全区域 */
-        const y = Math.max(safeTop + PROP_SIZE, bestPipe.gapY - PIPE_SAFE_MARGIN - PROP_SIZE);
-        console.log(`[道具生成] 下管上方, y=${y.toFixed(1)}`);
-        return y;
-      } else if (hasTop) {
-        /* 只有上管：放在上管下方安全区域 */
-        const y = Math.min(safeBottom - PROP_SIZE, bestPipe.gapY + PIPE_SAFE_MARGIN + PROP_SIZE);
-        console.log(`[道具生成] 上管下方, y=${y.toFixed(1)}`);
-        return y;
-      }
-    }
-
-    /* 兜底：无水管时放在屏幕中央 */
+    /* 兜底：屏幕中央 */
     const y = (safeTop + safeBottom) / 2;
-    console.log(`[道具生成] 无匹配水管，兜底中央, y=${y.toFixed(1)}`);
+    console.log(`[Prop] 兜底中央, y=${y.toFixed(1)}`);
     return y;
   }
 

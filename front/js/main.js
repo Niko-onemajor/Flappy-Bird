@@ -44,7 +44,6 @@ const PROP_COOLDOWN_MIN = 120;  /* 道具最小间隔帧数（2秒），防止�
 const PIPE_WIDTH = PIPE.WIDTH;
 const PROP_SIZE = PROP_CFG.SIZE;
 const PROP_SAFE_MARGIN = PROP_CFG.SAFE_MARGIN;
-const PROP_TYPES = ['shield', 'multiplier'];
 const MIN_SPACING = PIPE.MIN_SPACING;
 const MOVE_RANGE = PIPE.MOVE_RANGE;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
@@ -248,96 +247,58 @@ export default class Main {
     this.pipeTimer--;
     if (this.pipeTimer > 0) return;
 
+    /* 间距检查：若上一根水管离屏幕右边缘太近，延后生成 */
     if (this.databus.pipes.length > 0) {
       const last = this.databus.pipes[this.databus.pipes.length - 1];
-      if (last.x > SCREEN_WIDTH - MIN_SPACING) return;
+      if (last.x > SCREEN_WIDTH - MIN_SPACING) {
+        this.pipeTimer = 1;  /* 重置，防止连续递减到负数 */
+        return;
+      }
     }
 
+    /* 先生成水管，再基于水管精确计算道具和障碍物坐标 */
     const pipe = this.databus.pool.getItemByClass('pipe', Pipe);
     pipe.init(gap, speed);
     this.databus.pipes.push(pipe);
-    this.pipeTimer = interval;
+    this.pipeTimer = Math.max(interval, 30);  /* 保底最小值，防止过于接近0 */
+    console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
 
-    /* 道具生成：使用定时器控制间隔，防止扎堆和长期不刷 */
+    /* 道具生成：基于刚生成的水管 */
     this.propTimer--;
     if (this.propTimer <= 0 && Math.random() < propChance
         && this.databus.props.length < 3) {
-      this._createPropForPipe(pipe, speed);
+      this._createPropForPipe(pipe);
       this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
-      console.log(`[Prop] 生成道具 propTimer重置=${this.propTimer} 场上道具=${this.databus.props.length}`);
+      console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
     } else if (this.propTimer <= 0) {
-      console.log(`[Prop] 跳过生成 propTimer=${this.propTimer} props.length=${this.databus.props.length} propChance=${propChance.toFixed(2)}`);
+      this.propTimer = 1;  /* 跳过本次，重置计时器 */
+      console.log(`[Prop] 跳过 propTimer复归=${this.propTimer} props=${this.databus.props.length} chance=${propChance.toFixed(2)}`);
     }
 
-    /* 概率生成锯片（8分后），放在两根水管之间，限制最大数量 */
+    /* 锯片（8分后）：基于刚生成的水管 */
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
-      console.log(`[Saw] 触发生成 score=${this.databus.score} saws.length=${this.databus.saws.length}`);
+      console.log(`[Saw] 触发 score=${this.databus.score} saws=${this.databus.saws.length}`);
     }
 
-    /* 概率生成火箭（20分后），限制最大数量 */
+    /* 火箭（20分后）：基于刚生成的水管 */
     if (this.databus.score >= ROCKET_MIN_SCORE && Math.random() < ROCKET_SPAWN_CHANCE
         && this.databus.rockets.length < 6) {
       this._createRocketForPipe(pipe, speed);
-      console.log(`[Rocket] 触发生成 score=${this.databus.score} rockets.length=${this.databus.rockets.length}`);
+      console.log(`[Rocket] 触发 score=${this.databus.score} rockets=${this.databus.rockets.length}`);
     }
   }
 
-  _createPropForPipe(pipe, pipeSpeed) {
+  _createPropForPipe(pipe) {
     const prop = this.databus.pool.getItemByClass('prop', Prop);
-    prop.type = PROP_TYPES[Math.floor(Math.random() * PROP_TYPES.length)];
-    prop.visible = true;
-    prop.isActive = true;
-    prop.collected = false;
-    prop.animPhase = Math.random() * Math.PI * 2;
-    prop.speed = pipeSpeed;
-    prop.x = pipe.x + PIPE_WIDTH / 2 - PROP_SIZE / 2;
-    prop._parentPipe = pipe;
-
-    const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
-    const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
-    const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
-
-    if (hasTop && hasBottom) {
-      /* 双管：放在间隙正中央 */
-      const gapCenter = pipe.gapY + pipe.gap / 2;
-      prop.y = gapCenter - PROP_SIZE / 2;
-      /* 确保不超出间隙范围 */
-      const minY = pipe.gapY + PROP_SAFE_MARGIN;
-      const maxY = pipe.gapY + pipe.gap - PROP_SAFE_MARGIN - PROP_SIZE;
-      prop.y = Math.max(minY, Math.min(maxY, prop.y));
-    } else if (hasBottom) {
-      /* 只有下管：放在下管上方，确保安全边距 */
-      const minY = 50;
-      const maxY = pipe.gapY - PROP_SAFE_MARGIN - PROP_SIZE;
-      if (maxY < minY) {
-        prop.y = Math.max(50, pipe.gapY - PROP_SIZE - 4);
-      } else {
-        prop.y = minY + (maxY - minY) * 0.4;
-      }
-    } else {
-      /* 只有上管：放在上管下方，确保安全边距 */
-      const minY = pipe.gapY + PROP_SAFE_MARGIN;
-      const maxY = availableH - PROP_SIZE - 30;
-      if (maxY < minY) {
-        prop.y = minY;
-      } else {
-        prop.y = minY + (maxY - minY) * 0.5;
-      }
-    }
-
+    prop.init(pipe);  /* 内部基于水管精确计算X和Y */
     this.databus.props.push(prop);
   }
 
   _createSawForPipe(pipe, pipeSpeed) {
-    /* 锯片放在当前水管和下一根水管之间（或当前水管和屏幕右边缘之间） */
-    const pipes = this.databus.pipes;
-    const idx = pipes.indexOf(pipe);
-    const nextPipe = idx < pipes.length - 1 ? pipes[idx + 1] : null;
-
     const saw = this.databus.pool.getItemByClass('saw', Saw);
-    saw.init(pipeSpeed, pipe, nextPipe);
+    saw.init(pipeSpeed, pipe);  /* 基于水管计算位置，不堵死通路 */
     this.databus.saws.push(saw);
   }
 
