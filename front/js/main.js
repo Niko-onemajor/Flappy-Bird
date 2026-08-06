@@ -76,6 +76,7 @@ export default class Main {
   propTimer = 0;            /* 道具生成冷却计时器 */
   rocketTimer = 0;          /* 火箭生成冷却计时器（独立于水管生成） */
   _lastPropScore = 0;       /* 上次生成道具时的分数 */
+  _pipesSinceLastProp = 0;  /* 距离上次道具生成经过的水管数（每5根保底） */
   _scoreSubmitted = false;
   _playedDieSound = false;
   _prevScore = 0;
@@ -130,6 +131,7 @@ export default class Main {
     this.propTimer = 0;
     this.rocketTimer = 0;
     this._lastPropScore = 0;
+    this._pipesSinceLastProp = 0;
     this._scoreSubmitted = false;
     this._playedDieSound = false;
     this._prevScore = 0;
@@ -286,15 +288,20 @@ export default class Main {
     console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
 
     /* 道具生成：基于刚生成的水管（propTimer已由_updateTimers每帧递减） */
-    if (this.propTimer <= 0) {
-      if (Math.random() < propChance && this.databus.props.length < 3) {
-        this._createPropForPipe(pipe);
-        this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
-        console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
-      } else {
-        this.propTimer = 30;  /* 概率未命中，0.5秒后重试 */
-        console.log(`[Prop] 跳过 chance=${propChance.toFixed(2)} props=${this.databus.props.length} 重试timer=${this.propTimer}`);
-      }
+    this._pipesSinceLastProp++;
+    const forceProp = this._pipesSinceLastProp >= 5;  /* 每5根水管保底出一次 */
+    if (forceProp) {
+      console.log(`[Prop] 保底触发! pipesSinceLastProp=${this._pipesSinceLastProp}`);
+    }
+    if (this.propTimer <= 0 && (forceProp || Math.random() < propChance)
+        && this.databus.props.length < 3) {
+      this._createPropForPipe(pipe);
+      this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
+      this._pipesSinceLastProp = 0;
+      console.log(`[Prop] 生成道具 propTimer=${this.propTimer} 场上=${this.databus.props.length}${forceProp ? ' (保底)' : ''}`);
+    } else if (this.propTimer <= 0) {
+      this.propTimer = 30;  /* 概率未命中，0.5秒后重试 */
+      console.log(`[Prop] 跳过 chance=${propChance.toFixed(2)} props=${this.databus.props.length} 重试timer=${this.propTimer}`);
     }
 
     /* 锯片（8分后）：基于刚生成的水管，pipe已通过init校验 */
