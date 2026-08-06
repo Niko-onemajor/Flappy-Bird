@@ -291,18 +291,30 @@ export default class Main {
   }
 
   _createPropForPipe(pipe) {
+    if (!pipe || pipe.gapY == null || pipe.gap == null) {
+      console.warn('[Prop] 跳过生成：水管对象无效', pipe);
+      return;
+    }
     const prop = this.databus.pool.getItemByClass('prop', Prop);
     prop.init(pipe);  /* 内部基于水管精确计算X和Y */
     this.databus.props.push(prop);
   }
 
   _createSawForPipe(pipe, pipeSpeed) {
+    if (!pipe || pipe.gapY == null || pipe.gap == null) {
+      console.warn('[Saw] 跳过生成：水管对象无效', pipe);
+      return;
+    }
     const saw = this.databus.pool.getItemByClass('saw', Saw);
     saw.init(pipeSpeed, pipe);  /* 基于水管计算位置，不堵死通路 */
     this.databus.saws.push(saw);
   }
 
   _createRocketForPipe(pipe, pipeSpeed) {
+    if (!pipe || pipe.gapY == null || pipe.gap == null) {
+      console.warn('[Rocket] 跳过生成：水管对象无效', pipe);
+      return;
+    }
     const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
     rocket.init(pipeSpeed, pipe);
     this.databus.rockets.push(rocket);
