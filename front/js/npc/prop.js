@@ -5,6 +5,7 @@ import { PROP, GROUND, PIPE } from '../config';
 const PROP_SIZE = PROP.SIZE;
 const PROP_TYPES = ['shield', 'multiplier'];
 const PROP_DURATION = PROP.DURATION;
+const MULTIPLIER_DURATION = PROP.MULTIPLIER_DURATION;
 const FLOAT_AMP = PROP.FLOAT_AMP;
 const FLOAT_SPEED = PROP.FLOAT_SPEED;
 const PIPE_SAFE_MARGIN = PROP.SAFE_MARGIN;
@@ -190,7 +191,7 @@ export default class Prop extends Sprite {
         break;
       case 'multiplier':
         db.scoreMultiplier = 2;
-        db.multiplierTimer = PROP_DURATION;
+        db.multiplierTimer = MULTIPLIER_DURATION;
         break;
     }
   }

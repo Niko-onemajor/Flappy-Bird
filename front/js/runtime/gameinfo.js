@@ -1,6 +1,6 @@
 import Emitter from '../libs/tinyemitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
-import { GROUND } from '../config';
+import { GROUND, PROP } from '../config';
 
 export default class GameInfo extends Emitter {
   constructor() {
@@ -389,7 +389,7 @@ export default class GameInfo extends Emitter {
     const barY = SCREEN_HEIGHT - 30;  /* 地面下方，距底端30px */
 
     if (db.shieldActive) {
-      const pct = db.shieldTimer / 300;  /* 300 = 5秒参考值 */
+      const pct = db.shieldTimer / PROP.DURATION;
       /* 背景 */
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       this._roundRect(ctx, barX, barY, barW, barH, 5);
@@ -407,7 +407,7 @@ export default class GameInfo extends Emitter {
 
     if (db.scoreMultiplier > 1) {
       const yOff = db.shieldActive ? -22 : 0;
-      const pct = db.multiplierTimer / 300;
+      const pct = db.multiplierTimer / PROP.MULTIPLIER_DURATION;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
       ctx.fill();

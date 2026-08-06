@@ -313,8 +313,12 @@ export default class Main {
       console.warn('[Saw] 跳过生成：水管对象无效', pipe);
       return;
     }
+    /* 找到上一个水管（前一对），用于计算两根水管之间的空白区域 */
+    const pipes = this.databus.pipes;
+    const prevPipe = pipes.length >= 2 ? pipes[pipes.length - 2] : null;
+
     const saw = this.databus.pool.getItemByClass('saw', Saw);
-    saw.init(pipeSpeed, pipe);  /* 基于水管计算位置，不堵死通路 */
+    saw.init(pipeSpeed, pipe, prevPipe);
     this.databus.saws.push(saw);
   }
 

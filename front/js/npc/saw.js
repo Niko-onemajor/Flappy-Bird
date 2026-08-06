@@ -16,31 +16,36 @@ export default class Saw extends Sprite {
     super('', SAW_SIZE, SAW_SIZE);
   }
 
-  init(speed, pipe) {
+  init(speed, pipe, prevPipe) {
     this.visible = true;
     this.isActive = true;
     this.speed = speed;
     this.rotation = Math.random() * Math.PI * 2;
     this._hostPipe = pipe;
 
-    /* 水平位置：放在当前水管与下一个水管之间的空白区域（30%~70%位置） */
-    const gapStart = pipe.x + pipe.width;
-    const gapEnd = SCREEN_WIDTH;  /* 下一个水管将从屏幕右侧生成 */
-    const gapSpace = gapEnd - gapStart;
-    /* 留出边距，避免紧贴水管 */
-    const margin = 40;
+    /* 水平位置：放在"前一对水管"与"当前水管"之间的空白区域，不靠近任何水管 */
+    const prevRight = prevPipe ? Math.max(prevPipe.x + prevPipe.width, 0) : 0;
+    const currLeft = pipe.x;  /* 当前水管左边缘 = SCREEN_WIDTH */
+    const gapSpace = currLeft - prevRight;
+
+    /* 距离两边水管至少 80px，确保不阻碍玩家通过 */
+    const margin = Math.min(80, gapSpace * 0.25);
     const usableSpace = gapSpace - margin * 2;
-    if (usableSpace > 60) {
-      this.x = gapStart + margin + Math.random() * usableSpace;
+
+    if (usableSpace > 80) {
+      this.x = prevRight + margin + Math.random() * usableSpace;
+    } else if (gapSpace > 40) {
+      /* 空间不足但还能放，放中间 */
+      this.x = prevRight + gapSpace / 2 - this.width / 2;
     } else {
-      /* 空间不足时放在中间 */
-      this.x = gapStart + gapSpace / 2;
+      /* 极端情况：没有上一个水管（第一根），放在屏幕中间偏右 */
+      this.x = SCREEN_WIDTH * 0.4 + Math.random() * SCREEN_WIDTH * 0.3;
     }
 
     /* 垂直位置：放在水管间隙上方或下方，不堵死玩家通路 */
     this.y = this._calcSawY(pipe);
 
-    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} gapSpace=${gapSpace.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
+    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} prevRight=${prevRight.toFixed(1)} currLeft=${currLeft.toFixed(1)} gapSpace=${gapSpace.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
   }
 
   /* 核心原则：锯片放在水管间隙上方或下方，永远不堵死玩家唯一通路 */

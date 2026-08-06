@@ -49,8 +49,9 @@ export const DIFFICULTY = {
 export const PROP = {
   SIZE: 32,
   SPEED: 3,
-  DURATION: 180,       /* 护盾/双倍持续时间（帧，60fps=3秒） */
-  SHIELD_COOLDOWN: 180, /* 护盾冷却时间（帧，防止无限续盾） */
+  DURATION: 180,          /* 护盾持续时间（帧，60fps=3秒） */
+  MULTIPLIER_DURATION: 360, /* 双倍分数持续时间（帧，60fps=6秒） */
+  SHIELD_COOLDOWN: 180,   /* 护盾冷却时间（帧，防止无限续盾） */
   FLOAT_AMP: 4,
   FLOAT_SPEED: 0.06,
   SAFE_MARGIN: 24,
