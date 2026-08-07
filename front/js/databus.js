@@ -19,7 +19,6 @@ export default class DataBus {
   /* 道具状态 */
   shieldActive = false;    /* 护盾是否激活 */
   shieldTimer = 0;         /* 护盾剩余时间 */
-  shieldCooldown = 0;      /* 护盾冷却时间（防止无限续盾） */
   scoreMultiplier = 1;     /* 分数倍率 */
   multiplierTimer = 0;     /* 倍率剩余时间 */
 
@@ -43,7 +42,6 @@ export default class DataBus {
     this.isGameOver = false;
     this.shieldActive = false;
     this.shieldTimer = 0;
-    this.shieldCooldown = 0;
     this.scoreMultiplier = 1;
     this.multiplierTimer = 0;
     this.lives = 3;

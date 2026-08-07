@@ -53,7 +53,7 @@ export const PROP = {
   SPEED: 3,
   DURATION: 300,          /* 护盾持续时间（帧，60fps=5秒） */
   MULTIPLIER_DURATION: 360, /* 双倍分数持续时间（帧，60fps=6秒） */
-  SHIELD_COOLDOWN: 180,   /* 护盾冷却时间（帧，防止无限续盾） */
+  /* 护盾无冷却期，可连续拾取 */
   FLOAT_AMP: 4,
   FLOAT_SPEED: 0.06,
   SAFE_MARGIN: 24,

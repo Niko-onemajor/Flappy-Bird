@@ -47,7 +47,6 @@ const PROP_SAFE_MARGIN = PROP_CFG.SAFE_MARGIN;
 const MIN_SPACING = PIPE.MIN_SPACING;
 const MOVE_RANGE = PIPE.MOVE_RANGE;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
-const SHIELD_COOLDOWN = PROP_CFG.SHIELD_COOLDOWN;
 const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
@@ -519,7 +518,6 @@ export default class Main {
       const prop = this.databus.props[i];
       if (prop.collected) continue;
       if (this._isPropCollideWithPlayer(prop)) {
-        if (prop.type === 'shield' && this.databus.shieldCooldown > 0) continue;
         prop.collect();
         /* 从数组中移除，释放位置给新道具 */
         this.databus.props.splice(i, 1);
@@ -552,11 +550,7 @@ export default class Main {
       this.databus.shieldTimer--;
       if (this.databus.shieldTimer <= 0) {
         this.databus.shieldActive = false;
-        this.databus.shieldCooldown = SHIELD_COOLDOWN;
       }
-    }
-    if (this.databus.shieldCooldown > 0) {
-      this.databus.shieldCooldown--;
     }
     if (this.databus.scoreMultiplier > 1) {
       this.databus.multiplierTimer--;

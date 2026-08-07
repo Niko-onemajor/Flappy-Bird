@@ -96,13 +96,26 @@ export default class Player extends Animation {
       this.vy = 0.5;
     }
 
-    /* 撞到地面 —— 扣一条命，无敌后复活 */
+    /* 撞到地面 —— 护盾/扣命逻辑 */
     const groundY = SCREEN_HEIGHT - GROUND_Y_OFFSET - this.height;
     if (this.y >= groundY) {
       this.y = groundY;
       this.vy = 0;
       const db = GameGlobal.databus;
       if (db.invincibleTimer > 0) return;  /* 无敌中，忽略 */
+
+      /* 护盾激活时：消耗护盾，重置位置，获得1秒无敌 */
+      if (db.shieldActive) {
+        db.shieldActive = false;
+        db.shieldTimer = 0;
+        db.invincibleTimer = 60;  /* 1秒无敌（60帧） */
+        GameGlobal.sound.playShieldBreak();
+        console.log('[Player] 护盾抵挡地面碰撞，重置位置');
+        this.y = SCREEN_HEIGHT / 3;
+        this.vy = PLAYER.JUMP_VELOCITY * 0.5;
+        return;
+      }
+
       db.lives--;
       GameGlobal.sound.playHit();
       console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
