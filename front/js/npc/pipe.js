@@ -144,6 +144,28 @@ export default class Pipe extends Sprite {
       ctx.scale(1, -1);
       ctx.drawImage(this.pipeImg, -this.width / 2, 0, this.width, topH);
       ctx.restore();
+
+      /* 上管顶部管帽（连接件）：让水管看起来有支撑结构 */
+      const capWidth = this.width + 14;
+      const capHeight = 20;
+      const capX = this.x - 7;
+      const capY = 0;
+      const isGreen = this.pipeImg === PIPE_GREEN_IMG;
+      ctx.save();
+      /* 管帽主体 */
+      ctx.fillStyle = isGreen ? '#5B8C2A' : '#CC3333';
+      ctx.fillRect(capX, capY, capWidth, capHeight);
+      /* 管帽高光边（顶部） */
+      ctx.fillStyle = isGreen ? '#7AB648' : '#EE5555';
+      ctx.fillRect(capX, capY, capWidth, 3);
+      /* 管帽暗边（底部） */
+      ctx.fillStyle = isGreen ? '#3D6B1A' : '#991111';
+      ctx.fillRect(capX, capY + capHeight - 3, capWidth, 3);
+      /* 管帽中线装饰 */
+      ctx.fillStyle = isGreen ? '#4A7A22' : '#AA2222';
+      ctx.fillRect(capX, capY + 8, capWidth, 2);
+      ctx.fillRect(capX, capY + 14, capWidth, 2);
+      ctx.restore();
     }
 
     if (hasBottom) {
