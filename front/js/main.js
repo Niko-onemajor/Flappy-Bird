@@ -85,6 +85,8 @@ export default class Main {
   _countdownTimer = 0;
   _countdownStart = 0;
 
+  _homeRenderCount = 0;  /* 主页渲染帧计数，确保图片加载完成后再停止循环 */
+
   constructor() {
     this.player = new Player();
     this.databus.player = this.player;  /* 绑定到全局，供Rocket等组件访问 */
@@ -129,6 +131,7 @@ export default class Main {
     GameGlobal.screenState = SCREEN_STATE.HOME;
     GameGlobal.isGameOverServer = false;
     this._scoreSubmitted = false;
+    this._homeRenderCount = 0;
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
@@ -199,6 +202,7 @@ export default class Main {
     this.screenState = SCREEN_STATE.LEADERBOARD;
     GameGlobal.screenState = SCREEN_STATE.LEADERBOARD;
     this.gameInfo._leaderboardScrollY = 0;
+    this._homeRenderCount = 0;
     try {
       const data = await getTopScores(10);
       this.gameInfo._leaderboardData = data;
@@ -638,9 +642,15 @@ export default class Main {
 
     this.render();
 
-    /* HOME 和 LEADERBOARD 是静态画面，渲染一次后停止循环，由触摸事件重新启动 */
+    /* HOME 和 LEADERBOARD 是静态画面，渲染60帧（约1秒）后停止循环，
+       确保图片素材异步加载完成后再停止，由触摸事件重新启动 */
     if (this.screenState === SCREEN_STATE.HOME || this.screenState === SCREEN_STATE.LEADERBOARD) {
-      return;
+      this._homeRenderCount++;
+      if (this._homeRenderCount >= 60) {
+        return;
+      }
+    } else {
+      this._homeRenderCount = 0;
     }
 
     this.aniId = requestAnimationFrame(this._boundLoop);
