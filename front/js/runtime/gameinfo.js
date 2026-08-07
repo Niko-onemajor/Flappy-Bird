@@ -106,6 +106,15 @@ export default class GameInfo extends Emitter {
     /* 预加载心形图片 */
     this.heartImg = wx.createImage();
     this.heartImg.src = 'images/heart_full.png';
+
+    /* 音效开关按钮（右上角） */
+    this._soundMuted = false;
+    this.soundBtnArea = {
+      startX: SCREEN_WIDTH - 44,
+      startY: 8,
+      endX: SCREEN_WIDTH - 8,
+      endY: 42,
+    };
   }
 
   /* ========== 主页渲染 ========== */
@@ -148,6 +157,9 @@ export default class GameInfo extends Emitter {
       ctx.strokeText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
       ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
     }
+
+    /* 音效开关按钮 */
+    this._renderSoundBtn(ctx);
 
     /* 排行榜按钮 */
     const lbBtn = this.leaderboardBtnArea;
@@ -294,15 +306,6 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* ========== 游戏中渲染（旧版兼容） ========== */
-  render(ctx) {
-    this.renderHUD(ctx);
-
-    if (GameGlobal.databus && GameGlobal.databus.isGameOver) {
-      this.renderGameOver(ctx);
-    }
-  }
-
   /* ========== 新手引导（准备状态） ========== */
   renderReady(ctx) {
     /* 半透明遮罩 */
@@ -327,14 +330,14 @@ export default class GameInfo extends Emitter {
     ctx.strokeText('躲避水管，飞得越远分数越高！', cx, cy + 15);
     ctx.fillText('躲避水管，飞得越远分数越高！', cx, cy + 15);
 
-    /* 闪烁的"点击开始" */
-    const alpha = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+    /* 闪烁的"点击开始"（使用帧计数器，避免每帧 Date.now() 开销） */
+    const alpha = 0.5 + 0.5 * Math.sin((GameGlobal.databus.frame * 0.12));
     ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
     ctx.font = 'bold 16px Arial';
     ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 55);
   }
 
-  /* ========== 本地版渲染 ========== */
+  /* ========== 渲染（主入口） ========== */
   renderLocal(ctx, databus) {
     /* 使用数字图片显示分数 */
     this._drawScore(ctx, databus.score, SCREEN_WIDTH / 2, 40);
@@ -348,34 +351,13 @@ export default class GameInfo extends Emitter {
       this._renderHearts(ctx, databus);
     }
 
+    /* 音效开关按钮（始终显示） */
+    this._renderSoundBtn(ctx);
+
     /* 游戏结束 */
     if (databus.isGameOver) {
       this.renderGameOver(ctx);
     }
-  }
-
-  /* ========== 前后端分离版渲染 ========== */
-  renderServer(ctx, gameState) {
-    /* 使用数字图片显示分数 */
-    this._drawScore(ctx, gameState.score, SCREEN_WIDTH / 2, 40);
-
-    /* 道具状态栏 */
-    this.renderPropBarServer(ctx, gameState);
-
-    /* 游戏结束 */
-    if (gameState.isGameOver) {
-      this.renderGameOverServer(ctx, gameState);
-    }
-  }
-
-  /* HUD */
-  renderHUD(ctx) {
-    const db = GameGlobal.databus;
-    /* 使用数字图片显示分数 */
-    this._drawScore(ctx, db.score, SCREEN_WIDTH / 2, 40);
-
-    /* 道具状态栏 */
-    this.renderPropBar(ctx, db);
   }
 
   /* 用数字图片绘制分数 */
@@ -433,49 +415,6 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 服务端道具状态栏 - 放大且更明显 */
-  renderPropBarServer(ctx, gameState) {
-    const barY = SCREEN_HEIGHT - 40;
-    const barX = SCREEN_WIDTH / 2 - 120;
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    if (gameState.shieldActive) {
-      /* 黄色背景高亮 */
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
-      ctx.strokeStyle = '#FFA000';
-      ctx.lineWidth = 2;
-      const bx = barX;
-      const bw = 100;
-      const bh = 28;
-      ctx.beginPath();
-      this._roundRect(ctx, bx, barY - bh / 2, bw, bh, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#000000';
-      ctx.fillText(`🛡 护盾 ${Math.ceil(gameState.shieldTimer / 60)}s`, bx + bw / 2, barY);
-    }
-
-    if (gameState.scoreMultiplier > 1) {
-      /* 红色背景高亮 */
-      ctx.fillStyle = 'rgba(255, 82, 82, 0.8)';
-      ctx.strokeStyle = '#D32F2F';
-      ctx.lineWidth = 2;
-      const bx = barX + 140;
-      const bw = 100;
-      const bh = 28;
-      ctx.beginPath();
-      this._roundRect(ctx, bx, barY - bh / 2, bw, bh, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(`x2 ${Math.ceil(gameState.multiplierTimer / 60)}s`, bx + bw / 2, barY);
-    }
-  }
-
   /* 游戏结束 */
   renderGameOver(ctx) {
     /* 半透明遮罩 */
@@ -517,47 +456,6 @@ export default class GameInfo extends Emitter {
     ctx.fillText('重新开始', SCREEN_WIDTH / 2, (this.btnArea.startY + this.btnArea.endY) / 2);
 
     /* 返回主页按钮 */
-    ctx.fillStyle = '#2196F3';
-    ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('返回主页', SCREEN_WIDTH / 2, (this.menuBtnArea.startY + this.menuBtnArea.endY) / 2);
-  }
-
-  /* 服务端版游戏结束 */
-  renderGameOverServer(ctx, gameState) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    const score = gameState.score;
-
-    const goW = 192;
-    const goH = 42;
-    ctx.drawImage(this.gameoverImg, SCREEN_WIDTH / 2 - goW / 2, SCREEN_HEIGHT / 2 - 90, goW, goH);
-
-    this._drawScore(ctx, score, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30);
-
-    const best = this._getBestScore();
-    if (score >= best && score > 0) {
-      this._saveBestScore(score);
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('新纪录!', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
-    } else if (best > 0) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
-    }
-
-    ctx.fillStyle = '#4CAF50';
-    ctx.fillRect(this.btnArea.startX, this.btnArea.startY, 160, 40);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('重新开始', SCREEN_WIDTH / 2, (this.btnArea.startY + this.btnArea.endY) / 2);
-
     ctx.fillStyle = '#2196F3';
     ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
     ctx.fillStyle = '#ffffff';
@@ -662,6 +560,34 @@ export default class GameInfo extends Emitter {
     ctx.fillText(String(num), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
   }
 
+  /* ========== 音效开关 ========== */
+  _renderSoundBtn(ctx) {
+    const btn = this.soundBtnArea;
+    const w = btn.endX - btn.startX;
+    const h = btn.endY - btn.startY;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    this._roundRect(ctx, btn.startX, btn.startY, w, h, 6);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this._soundMuted ? '🔇' : '🔊', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2);
+  }
+
+  _toggleSound() {
+    this._soundMuted = !this._soundMuted;
+    if (GameGlobal.sound) {
+      GameGlobal.sound.setMuted(this._soundMuted);
+    }
+  }
+
+  /* 检测点是否在按钮区域内 */
+  _isInArea(point, area) {
+    return point.x >= area.startX && point.x <= area.endX &&
+           point.y >= area.startY && point.y <= area.endY;
+  }
+
   /* ========== 触摸事件 ========== */
   touchEventHandler(event) {
     if (!event.touches || event.touches.length === 0) return;
@@ -672,6 +598,11 @@ export default class GameInfo extends Emitter {
 
     /* 主页：点击开始按钮 */
     if (GameGlobal.screenState === 'home') {
+      /* 音效开关 */
+      if (this._isInArea(game, this.soundBtnArea)) {
+        this._toggleSound();
+        return;
+      }
       console.log('[Touch] 主页触摸:', game.x, game.y,
         '开始按钮:', this.homeBtnArea.startX, this.homeBtnArea.startY,
         '排行按钮:', this.leaderboardBtnArea.startX, this.leaderboardBtnArea.startY);
@@ -716,6 +647,12 @@ export default class GameInfo extends Emitter {
 
     /* 游戏中 / 准备中：点击屏幕任意位置 = 跳跃 */
     if (GameGlobal.screenState === 'playing' || GameGlobal.screenState === 'ready') {
+      /* 音效开关 */
+      if (this._isInArea(game, this.soundBtnArea)) {
+        this._toggleSound();
+        return;
+      }
+
       /* 检查暂停按钮 */
       if (GameGlobal.screenState === 'playing') {
         if (

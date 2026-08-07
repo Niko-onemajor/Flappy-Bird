@@ -335,17 +335,6 @@ export default class Main {
     this.databus.saws.push(saw);
   }
 
-  _createRocketForPipe(pipe, pipeSpeed) {
-    /* 保留兼容，新火箭不再需要 pipe 参数 */
-    if (!pipe || pipe.gapY == null || pipe.gap == null) {
-      console.warn('[Rocket] 跳过生成：水管对象无效', pipe);
-      return;
-    }
-    const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
-    rocket.init(pipeSpeed);
-    this.databus.rockets.push(rocket);
-  }
-
   /* 火箭难度等级：每8分提升一级，最大3个，冷却从150帧缓慢缩短 */
   _getRocketLevel(score) {
     const level = Math.floor((score - ROCKET_MIN_SCORE) / 8) + 1;
@@ -565,6 +554,11 @@ export default class Main {
     this.databus.lives--;
     console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
     GameGlobal.sound.playHit();
+
+    /* 振动反馈（轻触） */
+    if (typeof wx.vibrateShort === 'function') {
+      wx.vibrateShort({ type: 'light' });
+    }
 
     if (this.databus.lives <= 0) {
       this.player.destroy();

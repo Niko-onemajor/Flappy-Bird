@@ -29,25 +29,4 @@ if (main && main.loop) {
   }
 }
 
-/* 利用 CPU 空闲期预加载音频资源，提升网络利用率 */
-if (typeof wx.createInnerAudioContext === 'function') {
-  /* 延迟到主循环启动后预加载，不阻塞主线程 */
-  setTimeout(() => {
-    const audioFiles = [
-      'audio/bgm.mp3', 'audio/wing.mp3', 'audio/point.mp3',
-      'audio/hit.mp3', 'audio/die.mp3', 'audio/swoosh.mp3',
-      'audio/shield_break.mp3', 'audio/shield_pickup.mp3',
-      'audio/score_x2.mp3', 'audio/fuse_burn.mp3', 'audio/rocket_fly.mp3',
-    ];
-    audioFiles.forEach((src) => {
-      const ctx = wx.createInnerAudioContext();
-      ctx.src = src;
-      ctx.volume = 0;
-      /* 预加载后立即释放，音效管理器会在使用时重新创建 */
-      setTimeout(() => {
-        try { ctx.destroy(); } catch (e) { /* ignore */ }
-      }, 100);
-    });
-    console.log(`[Perf] 预加载 ${audioFiles.length} 个音频资源完成`);
-  }, 500);
-}
+/* 音频资源由 sound.js 按需延迟创建 InnerAudioContext，无需提前预加载 */

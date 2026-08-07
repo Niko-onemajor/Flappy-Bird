@@ -36,6 +36,9 @@ export default class BackGround {
     this.bgScale = skyH / BG_IMG_H;
     this.bgDrawW = BG_IMG_W * this.bgScale;
     this.bgDrawH = skyH;
+
+    /* 预创建天空渐变（全屏尺寸不变，可缓存） */
+    this._skyGradient = null;
   }
 
   update() {
@@ -74,12 +77,14 @@ export default class BackGround {
       ctx.fillRect(0, groundY, screenW, screenH - groundY);
     }
 
-    /* 2. 天空渐变 - 仅填充地面以上区域 */
+    /* 2. 天空渐变 - 仅填充地面以上区域（使用缓存渐变，避免每帧创建） */
     if (groundY > 0) {
-      const gradient = ctx.createLinearGradient(0, 0, 0, screenH);
-      gradient.addColorStop(0, '#4DC9F6');
-      gradient.addColorStop(1, '#87CEEB');
-      ctx.fillStyle = gradient;
+      if (!this._skyGradient) {
+        this._skyGradient = ctx.createLinearGradient(0, 0, 0, screenH);
+        this._skyGradient.addColorStop(0, '#4DC9F6');
+        this._skyGradient.addColorStop(1, '#87CEEB');
+      }
+      ctx.fillStyle = this._skyGradient;
       ctx.fillRect(0, 0, screenW, groundY);
     }
 

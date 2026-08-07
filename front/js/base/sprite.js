@@ -31,25 +31,4 @@ export default class Sprite extends Emitter {
 
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
   }
-
-  /**
-   * 碰撞检测：目标精灵的中心点在本精灵矩形内即视为碰撞
-   * @param{Sprite} sp: Sprite的实例
-   */
-  isCollideWith(sp) {
-    const spX = sp.x + sp.width / 2;
-    const spY = sp.y + sp.height / 2;
-
-    /* 不可见则不检测 */
-    if (!this.visible || !sp.visible) return false;
-    /* 不可碰撞则不检测 */
-    if (!this.isActive || !sp.isActive) return false;
-
-    return !!(
-      spX >= this.x &&
-      spX <= this.x + this.width &&
-      spY >= this.y &&
-      spY <= this.y + this.height
-    );
-  }
 }

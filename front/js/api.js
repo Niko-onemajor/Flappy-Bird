@@ -58,23 +58,6 @@ function request(method, path, data, retries = 2, delay = 1000) {
   });
 }
 
-/* 游戏 API */
-export function startGame(screenWidth, screenHeight) {
-  return request('POST', '/api/game/start', { screenWidth, screenHeight });
-}
-
-export function gameTick(sessionId) {
-  return request('POST', `/api/game/${sessionId}/tick`);
-}
-
-export function gameFlap(sessionId) {
-  return request('POST', `/api/game/${sessionId}/flap`);
-}
-
-export function getGameState(sessionId) {
-  return request('GET', `/api/game/${sessionId}/state`);
-}
-
 /* 排行榜 API */
 export function submitScore(playerName, score) {
   return request('POST', '/api/score', { playerName, score });

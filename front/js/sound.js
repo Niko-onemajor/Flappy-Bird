@@ -116,14 +116,10 @@ export default class Sound {
     this._fuseBurnPlaying = true;
     const a = this._getAudio('fuseBurn');
     a.seek(0);
+    a.onEnded(() => {
+      this._fuseBurnPlaying = false;
+    });
     a.play();
-    /* 2秒后停止，只取引信部分 */
-    setTimeout(() => {
-      try {
-        a.stop();
-        this._fuseBurnPlaying = false;
-      } catch (e) { /* ignore */ }
-    }, 2000);
   }
 
   /* 火箭飞行音效：只播一次，不重叠 */
@@ -158,5 +154,15 @@ export default class Sound {
     });
     this._fuseBurnPlaying = false;
     this._rocketFlyPlaying = false;
+  }
+
+  /* 静音/取消静音 */
+  setMuted(muted) {
+    Object.keys(this._cache).forEach((key) => {
+      const a = this._cache[key];
+      if (a) {
+        a.volume = muted ? 0 : (AUDIO_CONFIG[key] ? AUDIO_CONFIG[key].volume : 0.3);
+      }
+    });
   }
 }

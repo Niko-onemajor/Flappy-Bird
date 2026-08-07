@@ -214,19 +214,6 @@ export default class Player extends Animation {
     ctx.restore();
   }
 
-  _renderShieldIcon(ctx, cx, cy) {
-    ctx.save();
-    ctx.fillStyle = '#FFD700';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeText('\uD83D\uDEE1', cx + 18, cy - 18);
-    ctx.fillText('\uD83D\uDEE1', cx + 18, cy - 18);
-    ctx.restore();
-  }
-
   _renderMultiplierIcon(ctx, cx, cy) {
     ctx.save();
     ctx.fillStyle = '#FF5252';
