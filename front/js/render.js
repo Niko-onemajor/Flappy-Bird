@@ -1,4 +1,3 @@
-GameGlobal.canvas = wx.createCanvas();
 const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
 
 /* Canvas 物理尺寸 = 实际屏幕像素 */

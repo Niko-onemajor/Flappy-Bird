@@ -9,7 +9,7 @@ const TRACK_DURATION = 120;  /* 追踪阶段：120帧 = 2秒 */
 /* 预加载火箭图片（带错误检测） */
 const ROCKET_IMG = (() => {
   const img = wx.createImage();
-  img.onload = () => console.log('[Rocket] 图片加载成功');
+  img.onload = () => { if (GameGlobal.DEBUG_LOG) console.log('[Rocket] 图片加载成功'); };
   img.onerror = (e) => console.error('[Rocket] 图片加载失败!', e);
   img.src = 'images/rocket.png';
   return img;
@@ -56,7 +56,7 @@ export default class Rocket extends Sprite {
       GameGlobal.sound.playFuseBurn();
     }
 
-    console.log(`[Rocket] 追踪阶段开始 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} trackTimer=${this.trackTimer}`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Rocket] 追踪阶段开始 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} trackTimer=${this.trackTimer}`);
   }
 
   update() {
@@ -88,7 +88,7 @@ export default class Rocket extends Sprite {
           GameGlobal.sound.playRocketFly();
         }
 
-        console.log(`[Rocket] 锁定发射! target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}°`);
+        if (GameGlobal.DEBUG_LOG) console.log(`[Rocket] 锁定发射! target=(${this.targetX.toFixed(1)},${this.targetY.toFixed(1)}) angle=${(this.angle * 180 / Math.PI).toFixed(1)}°`);
       }
       return;
     }
@@ -162,12 +162,16 @@ export default class Rocket extends Sprite {
     /* 火焰尾迹（火箭尾部 = 图片底部）- 动态渐变火焰 */
     const flameLen = 18 + Math.sin(this.trailPhase) * 6;
     const flameW = 6 + Math.sin(this.trailPhase * 2) * 2;
-    const flameGrad = ctx.createLinearGradient(0, this.height / 2, 0, this.height / 2 + flameLen);
-    flameGrad.addColorStop(0, 'rgba(255, 200, 50, 0.9)');
-    flameGrad.addColorStop(0.4, 'rgba(255, 120, 20, 0.7)');
-    flameGrad.addColorStop(0.7, 'rgba(255, 50, 10, 0.4)');
-    flameGrad.addColorStop(1, 'rgba(200, 20, 0, 0)');
-    ctx.fillStyle = flameGrad;
+    /* 缓存渐变：仅火焰长度变化超过阈值时重建，避免每帧创建 */
+    if (!this._flameGrad || Math.abs(this._lastFlameLen - flameLen) > 3) {
+      this._flameGrad = ctx.createLinearGradient(0, this.height / 2, 0, this.height / 2 + flameLen);
+      this._flameGrad.addColorStop(0, 'rgba(255, 200, 50, 0.9)');
+      this._flameGrad.addColorStop(0.4, 'rgba(255, 120, 20, 0.7)');
+      this._flameGrad.addColorStop(0.7, 'rgba(255, 50, 10, 0.4)');
+      this._flameGrad.addColorStop(1, 'rgba(200, 20, 0, 0)');
+      this._lastFlameLen = flameLen;
+    }
+    ctx.fillStyle = this._flameGrad;
     ctx.beginPath();
     ctx.moveTo(0, this.height / 2 - 2);
     ctx.quadraticCurveTo(-flameW, this.height / 2 + flameLen * 0.5, 0, this.height / 2 + flameLen);

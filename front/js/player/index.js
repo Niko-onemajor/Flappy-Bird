@@ -1,4 +1,4 @@
-import Animation from '../base/animation';
+import Sprite from '../base/sprite';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 import { PLAYER, GROUND } from '../config';
 
@@ -31,7 +31,7 @@ const birdFrameCache = BIRD_FRAMES.map((src) => {
   return img;
 });
 
-export default class Player extends Animation {
+export default class Player extends Sprite {
   vy = 0;               /* 垂直速度 */
   targetRotation = 0;   /* 目标旋转角度 */
   currentRotation = 0;  /* 当前旋转角度（带惯性） */
@@ -43,7 +43,6 @@ export default class Player extends Animation {
     super(BIRD_FRAMES[0], BIRD_WIDTH, BIRD_HEIGHT);
     this._loadFrames();
     this.init();
-    this.initEvent();
   }
 
   /* 加载所有帧图片（从预加载缓存） */
@@ -62,10 +61,6 @@ export default class Player extends Animation {
     this.effectPhase = 0;
     this.flapIndex = 0;
     this.flapCounter = 0;
-  }
-
-  initEvent() {
-    /* 前后端分离版：触摸事件由 GameInfo 统一处理，不再在此注册 */
   }
 
   update() {
@@ -110,7 +105,7 @@ export default class Player extends Animation {
         db.shieldTimer = 0;
         db.invincibleTimer = 60;  /* 1秒无敌（60帧） */
         GameGlobal.sound.playShieldBreak();
-        console.log('[Player] 护盾抵挡地面碰撞，重置位置');
+        if (GameGlobal.DEBUG_LOG) console.log('[Player] 护盾抵挡地面碰撞，重置位置');
         this.y = SCREEN_HEIGHT / 3;
         this.vy = PLAYER.JUMP_VELOCITY * 0.5;
         return;
@@ -118,7 +113,7 @@ export default class Player extends Animation {
 
       db.lives--;
       GameGlobal.sound.playHit();
-      console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
+      if (GameGlobal.DEBUG_LOG) console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
       if (db.lives <= 0) {
         this.destroy();
         db.gameOver();

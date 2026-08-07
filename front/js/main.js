@@ -56,6 +56,9 @@ const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
 /* 碰撞箱可视化调试开关 */
 GameGlobal.DEBUG_COLLISION = false;
 
+/* 调试日志开关：关闭后过滤实体生成、触摸坐标等详细日志 */
+GameGlobal.DEBUG_LOG = false;
+
 /* 调试模式：启动后分数直接跳到25，方便测试火箭 */
 GameGlobal.DEBUG_SKIP_SCORE = false;
 
@@ -98,6 +101,14 @@ export default class Main {
 
     GameGlobal.screenState = SCREEN_STATE.HOME;
     console.log('[Main] 初始化完成，屏幕状态:', GameGlobal.screenState);
+
+    /* 应用隐藏时自动暂停 */
+    wx.onHide(() => {
+      if (this.screenState === SCREEN_STATE.PLAYING) {
+        this.pauseGame();
+      }
+    });
+
     this.loop();
   }
 
@@ -156,7 +167,7 @@ export default class Main {
       /* 调试：跳过前20分，立即测试火箭 */
       if (GameGlobal.DEBUG_SKIP_SCORE) {
         this.databus.score = 25;
-        console.log('[Debug] 分数跳过至25，开始测试火箭');
+        if (GameGlobal.DEBUG_LOG) console.log('[Debug] 分数跳过至25，开始测试火箭');
       }
       return;
     }
@@ -284,7 +295,7 @@ export default class Main {
     pipe.init(gap, speed);
     this.databus.pipes.push(pipe);
     this.pipeTimer = Math.max(interval, 30);  /* 保底最小值，防止过于接近0 */
-    console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Pipe] 生成 x=${pipe.x.toFixed(1)} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap} type=${pipe.pipeType} interval=${interval}`);
 
     /* 道具生成：基于刚生成的水管 */
     this._pipesSinceLastProp++;
@@ -426,8 +437,7 @@ export default class Main {
       const saw = this.databus.saws[i];
       saw.update();
       if (saw.x + saw.width < -20) {
-        this.databus.saws.splice(i, 1);
-        this.databus.pool.recover('saw', saw);
+        this.databus.removeSaw(saw);
       }
     }
   }
@@ -438,9 +448,7 @@ export default class Main {
       rocket.update();
       if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 300
           || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
-        rocket.cleanup();
-        this.databus.rockets.splice(i, 1);
-        this.databus.pool.recover('rocket', rocket);
+        this.databus.removeRocket(rocket);
       }
     }
   }
@@ -471,8 +479,7 @@ export default class Main {
       if (saw.isCollideWithBird(this.player)) {
         if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
-          this.databus.saws.splice(i, 1);
-          this.databus.pool.recover('saw', saw);
+          this.databus.removeSaw(saw);
           this.databus.shieldActive = false;
           this.databus.shieldTimer = 0;
           GameGlobal.sound.playShieldBreak();
@@ -489,9 +496,7 @@ export default class Main {
       if (rocket.isCollideWithBird(this.player)) {
         if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
         if (this.databus.shieldActive) {
-          rocket.cleanup();
-          this.databus.rockets.splice(i, 1);
-          this.databus.pool.recover('rocket', rocket);
+          this.databus.removeRocket(rocket);
           this.databus.shieldActive = false;
           this.databus.shieldTimer = 0;
           GameGlobal.sound.playShieldBreak();
@@ -528,7 +533,8 @@ export default class Main {
     const propCy = prop.y + prop.height / 2;
     const dx = pcx - propCx;
     const dy = pcy - propCy;
-    return Math.sqrt(dx * dx + dy * dy) < (this.player.width / 2 + prop.width / 2);
+    const threshold = this.player.width / 2 + prop.width / 2;
+    return dx * dx + dy * dy < threshold * threshold;
   }
 
   _updateTimers() {
@@ -552,7 +558,7 @@ export default class Main {
   /* 玩家受伤：扣一条命，短暂无敌 */
   _onPlayerHit() {
     this.databus.lives--;
-    console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
     GameGlobal.sound.playHit();
 
     /* 振动反馈（轻触） */
@@ -631,6 +637,12 @@ export default class Main {
     }
 
     this.render();
+
+    /* HOME 和 LEADERBOARD 是静态画面，渲染一次后停止循环，由触摸事件重新启动 */
+    if (this.screenState === SCREEN_STATE.HOME || this.screenState === SCREEN_STATE.LEADERBOARD) {
+      return;
+    }
+
     this.aniId = requestAnimationFrame(this._boundLoop);
   }
 }

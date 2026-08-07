@@ -128,6 +128,9 @@ export default class Sound {
     this._rocketFlyPlaying = true;
     const a = this._getAudio('rocketFly');
     a.seek(0);
+    a.onEnded(() => {
+      this._rocketFlyPlaying = false;
+    });
     a.play();
   }
 

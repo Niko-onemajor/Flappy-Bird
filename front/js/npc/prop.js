@@ -58,7 +58,7 @@ export default class Prop extends Sprite {
     /* 第二步：基于水管精确计算Y —— 确保在玩家必经之路上 */
     this.y = this._findSafeY(pipe);
 
-    console.log(`[Prop] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} type=${this.type} pipeType=${pipe.pipeType} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap}`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} type=${this.type} pipeType=${pipe.pipeType} gapY=${pipe.gapY.toFixed(1)} gap=${pipe.gap}`);
   }
 
   /* 基于水管位置精确计算道具Y坐标，确保玩家可拾取且不堵死通路 */
@@ -73,23 +73,23 @@ export default class Prop extends Sprite {
       /* 双管：放在间隙正中央，玩家必经之路 */
       const gapCenter = pipe.gapY + pipe.gap / 2;
       const y = Math.max(safeTop + PROP_SIZE, Math.min(gapCenter, safeBottom - PROP_SIZE));
-      console.log(`[Prop] 双管间隙中心=${gapCenter.toFixed(1)}, 最终y=${y.toFixed(1)}`);
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 双管间隙中心=${gapCenter.toFixed(1)}, 最终y=${y.toFixed(1)}`);
       return y;
     } else if (hasBottom) {
       /* 只有下管：放在下管上方安全区域，不堵死上方通路 */
       const y = Math.max(safeTop + PROP_SIZE, pipe.gapY - PIPE_SAFE_MARGIN - PROP_SIZE);
-      console.log(`[Prop] 下管上方, y=${y.toFixed(1)}`);
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 下管上方, y=${y.toFixed(1)}`);
       return y;
     } else if (hasTop) {
       /* 只有上管：放在上管下方安全区域，不堵死下方通路 */
       const y = Math.min(safeBottom - PROP_SIZE, pipe.gapY + PIPE_SAFE_MARGIN + PROP_SIZE);
-      console.log(`[Prop] 上管下方, y=${y.toFixed(1)}`);
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 上管下方, y=${y.toFixed(1)}`);
       return y;
     }
 
     /* 兜底：屏幕中央 */
     const y = (safeTop + safeBottom) / 2;
-    console.log(`[Prop] 兜底中央, y=${y.toFixed(1)}`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 兜底中央, y=${y.toFixed(1)}`);
     return y;
   }
 

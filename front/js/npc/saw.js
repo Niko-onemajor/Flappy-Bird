@@ -29,7 +29,7 @@ export default class Saw extends Sprite {
     /* 垂直位置：放在水管间隙上方或下方，不堵死玩家通路 */
     this.y = this._calcSawY(pipe);
 
-    console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
+    if (GameGlobal.DEBUG_LOG) console.log(`[Saw] 生成 x=${this.x.toFixed(1)} y=${this.y.toFixed(1)} pipe(x=${pipe.x.toFixed(1)},gapY=${pipe.gapY.toFixed(1)},gap=${pipe.gap},type=${pipe.pipeType})`);
   }
 
   /* 核心原则：锯片放在水管间隙上方或下方，永远不堵死玩家唯一通路 */

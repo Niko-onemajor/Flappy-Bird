@@ -45,6 +45,7 @@ export default class GameInfo extends Emitter {
     this._touchStartY = null;        /* 触摸起始Y坐标 */
     this._scrollStartY = 0;          /* 触摸起始时的滚动位置 */
     this._countdownValue = 0;        /* 倒计时秒数 */
+    this._bestScoreSaved = false;    /* 最佳成绩是否已保存 */
 
     /* 暂停按钮（左上角，音效按钮右边） */
     this.pauseBtnArea = {
@@ -339,6 +340,11 @@ export default class GameInfo extends Emitter {
 
   /* ========== 渲染（主入口） ========== */
   renderLocal(ctx, databus) {
+    /* 重置最佳成绩保存标记（游戏非结束状态时） */
+    if (!databus.isGameOver) {
+      this._bestScoreSaved = false;
+    }
+
     /* 使用数字图片显示分数 */
     this._drawScore(ctx, databus.score, SCREEN_WIDTH / 2, 40);
 
@@ -434,7 +440,10 @@ export default class GameInfo extends Emitter {
     /* 最高分 */
     const best = this._getBestScore();
     if (score >= best && score > 0) {
-      this._saveBestScore(score);
+      if (!this._bestScoreSaved) {
+        this._saveBestScore(score);
+        this._bestScoreSaved = true;
+      }
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
@@ -594,7 +603,7 @@ export default class GameInfo extends Emitter {
     const { clientX, clientY } = event.touches[0];
     /* 转换到游戏世界坐标 */
     const game = toGameCoord(clientX, clientY);
-    console.log('[Touch] screenState:', GameGlobal.screenState, 'screen:', clientX, clientY, 'game:', game.x.toFixed(1), game.y.toFixed(1));
+    if (GameGlobal.DEBUG_LOG) console.log('[Touch] screenState:', GameGlobal.screenState, 'screen:', clientX, clientY, 'game:', game.x.toFixed(1), game.y.toFixed(1));
 
     /* 主页：点击开始按钮 */
     if (GameGlobal.screenState === 'home') {
@@ -603,7 +612,7 @@ export default class GameInfo extends Emitter {
         this._toggleSound();
         return;
       }
-      console.log('[Touch] 主页触摸:', game.x, game.y,
+      if (GameGlobal.DEBUG_LOG) console.log('[Touch] 主页触摸:', game.x, game.y,
         '开始按钮:', this.homeBtnArea.startX, this.homeBtnArea.startY,
         '排行按钮:', this.leaderboardBtnArea.startX, this.leaderboardBtnArea.startY);
       if (
@@ -612,7 +621,7 @@ export default class GameInfo extends Emitter {
         game.y >= this.homeBtnArea.startY &&
         game.y <= this.homeBtnArea.endY
       ) {
-        console.log('[Touch] → 点击开始游戏');
+        if (GameGlobal.DEBUG_LOG) console.log('[Touch] → 点击开始游戏');
         this.emit('start');
         return;
       }
@@ -622,7 +631,7 @@ export default class GameInfo extends Emitter {
         game.y >= this.leaderboardBtnArea.startY &&
         game.y <= this.leaderboardBtnArea.endY
       ) {
-        console.log('[Touch] → 点击排行榜');
+        if (GameGlobal.DEBUG_LOG) console.log('[Touch] → 点击排行榜');
         this.emit('showLeaderboard');
         return;
       }
@@ -633,7 +642,7 @@ export default class GameInfo extends Emitter {
     if (GameGlobal.screenState === 'leaderboard') {
       this._touchStartY = game.y;
       this._scrollStartY = this._leaderboardScrollY;
-      console.log('[Leaderboard] touchStart y=', game.y, 'scrollStart=', this._scrollStartY);
+      if (GameGlobal.DEBUG_LOG) console.log('[Leaderboard] touchStart y=', game.y, 'scrollStart=', this._scrollStartY);
       if (
         game.x >= this.backBtnArea.startX &&
         game.x <= this.backBtnArea.endX &&
@@ -756,7 +765,7 @@ export default class GameInfo extends Emitter {
     this._leaderboardScrollY = this._scrollStartY + delta;
     this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
 
-    if (GameGlobal.DEBUG_COLLISION) {
+    if (GameGlobal.DEBUG_LOG && GameGlobal.DEBUG_COLLISION) {
       console.log('[Leaderboard] touchMove clientY=', clientY, 'delta=', delta.toFixed(1), 'scrollY=', this._leaderboardScrollY.toFixed(1));
     }
   }

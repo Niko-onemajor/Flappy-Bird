@@ -67,4 +67,21 @@ export default class DataBus {
       this.pool.recover('prop', prop);
     }
   }
+
+  removeSaw(saw) {
+    const idx = this.saws.indexOf(saw);
+    if (idx > -1) {
+      this.saws.splice(idx, 1);
+      this.pool.recover('saw', saw);
+    }
+  }
+
+  removeRocket(rocket) {
+    const idx = this.rockets.indexOf(rocket);
+    if (idx > -1) {
+      rocket.cleanup();
+      this.rockets.splice(idx, 1);
+      this.pool.recover('rocket', rocket);
+    }
+  }
 }
