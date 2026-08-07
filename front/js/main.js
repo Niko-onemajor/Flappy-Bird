@@ -595,7 +595,6 @@ export default class Main {
       this.gameInfo.renderLeaderboard(ctx);
     } else if (this.screenState === SCREEN_STATE.READY) {
       this.databus.pipes.forEach((p) => p.render(ctx));
-      this.bg.renderCeiling(ctx);
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
       this.databus.rockets.forEach((r) => r.render(ctx));
@@ -603,7 +602,6 @@ export default class Main {
       this.gameInfo.renderReady(ctx);
     } else if (this.screenState === SCREEN_STATE.PAUSED) {
       this.databus.pipes.forEach((p) => p.render(ctx));
-      this.bg.renderCeiling(ctx);
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
       this.databus.rockets.forEach((r) => r.render(ctx));
@@ -612,7 +610,6 @@ export default class Main {
       this.gameInfo.renderPauseOverlay(ctx);
     } else if (this.screenState === SCREEN_STATE.COUNTDOWN) {
       this.databus.pipes.forEach((p) => p.render(ctx));
-      this.bg.renderCeiling(ctx);
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
       this.databus.rockets.forEach((r) => r.render(ctx));
@@ -621,7 +618,6 @@ export default class Main {
       this.gameInfo.renderCountdown(ctx);
     } else {
       this.databus.pipes.forEach((p) => p.render(ctx));
-      this.bg.renderCeiling(ctx);
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
       this.databus.rockets.forEach((r) => r.render(ctx));

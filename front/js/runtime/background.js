@@ -92,7 +92,7 @@ export default class BackGround {
 
     /* 4. 地面以下区域用泥土色填充（视觉延伸） */
     if (groundY + groundH < screenH) {
-      ctx.fillStyle = '#C49A6C';
+      ctx.fillStyle = '#DED895';
       ctx.fillRect(0, groundY + groundH, screenW, screenH - groundY - groundH);
     }
   }
@@ -120,29 +120,5 @@ export default class BackGround {
     for (let i = 0; i < tilesNeeded; i++) {
       ctx.drawImage(this.baseImg, i * w - this.baseX, baseY, w, h);
     }
-  }
-
-  /**
-   * 在设计分辨率空间内渲染天花板（水管之上）
-   * 让水管看起来从天花板结构中伸出
-   */
-  renderCeiling(ctx) {
-    const ceilingH = 30;
-    /* 天花板主体渐变 */
-    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, ceilingH);
-    ceilingGrad.addColorStop(0, '#4A4A4A');
-    ceilingGrad.addColorStop(1, '#6B6B6B');
-    ctx.fillStyle = ceilingGrad;
-    ctx.fillRect(0, 0, SCREEN_WIDTH, ceilingH);
-    /* 天花板底部阴影过渡 */
-    const ceilShadow = ctx.createLinearGradient(0, ceilingH - 6, 0, ceilingH);
-    ceilShadow.addColorStop(0, 'rgba(0,0,0,0)');
-    ceilShadow.addColorStop(1, 'rgba(0,0,0,0.3)');
-    ctx.fillStyle = ceilShadow;
-    ctx.fillRect(0, ceilingH - 6, SCREEN_WIDTH, 6);
-    /* 天花板装饰线 */
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(0, 8, SCREEN_WIDTH, 1);
-    ctx.fillRect(0, 16, SCREEN_WIDTH, 1);
   }
 }
