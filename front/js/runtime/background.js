@@ -1,4 +1,4 @@
-import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_W_REAL, SCREEN_H_REAL, GAME_SCALE, GAME_OFFSET_Y } from '../render';
 import { GROUND } from '../config';
 
 const BG_IMAGES = ['images/background-day.png', 'images/background-night.png'];
@@ -22,6 +22,7 @@ const baseCache = (() => {
 /**
  * 程序化背景：天空图（视差滚动） + 滚动地面
  * 每次游戏随机选择白天/夜晚背景
+ * 全屏渲染：背景填满整个 Canvas，游戏元素在设计分辨率内缩放
  */
 export default class BackGround {
   constructor() {
@@ -30,7 +31,7 @@ export default class BackGround {
     this.baseX = 0;
     this.bgOffsetX = 0;
 
-    /* 背景缩放：高度填满地面以上区域 */
+    /* 背景缩放：高度填满地面以上区域（设计分辨率） */
     const skyH = SCREEN_HEIGHT - GROUND.HEIGHT;
     this.bgScale = skyH / BG_IMG_H;
     this.bgDrawW = BG_IMG_W * this.bgScale;
@@ -50,6 +51,50 @@ export default class BackGround {
   render(ctx) {
     this._drawBg(ctx);
     this._drawBase(ctx);
+  }
+
+  /**
+   * 全屏渲染背景（无缩放变换）
+   * 用于填满整个 Canvas 边界区域，确保无黑边
+   */
+  renderFullScreen(ctx) {
+    const screenW = SCREEN_W_REAL;
+    const screenH = SCREEN_H_REAL;
+
+    /* 计算游戏地面在屏幕上的位置 */
+    const gameGroundY = (SCREEN_HEIGHT - GROUND.HEIGHT) * GAME_SCALE + GAME_OFFSET_Y;
+
+    /* 1. 天空渐变 - 填满全屏背景 */
+    const gradient = ctx.createLinearGradient(0, 0, 0, screenH);
+    gradient.addColorStop(0, '#4DC9F6');
+    gradient.addColorStop(1, '#87CEEB');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, screenW, screenH);
+
+    /* 2. 天空背景图片平铺 - 在地面以上区域 */
+    if (gameGroundY > 0) {
+      const bgScale = gameGroundY / BG_IMG_H;
+      const bgTileW = BG_IMG_W * bgScale;
+      const tilesNeeded = Math.ceil(screenW / bgTileW) + 2;
+      for (let i = 0; i < tilesNeeded; i++) {
+        ctx.drawImage(this.bgImg, i * bgTileW - this.bgOffsetX * bgScale, 0, bgTileW, gameGroundY);
+      }
+    }
+
+    /* 3. 地面平铺 - 从游戏地面位置开始，延伸到屏幕底部 */
+    const groundH = GROUND.HEIGHT * GAME_SCALE;
+    const groundY = Math.min(gameGroundY, screenH - groundH);
+    const groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
+    const groundTilesNeeded = Math.ceil(screenW / groundTileW) + 2;
+    for (let i = 0; i < groundTilesNeeded; i++) {
+      ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
+    }
+
+    /* 4. 地面以下区域用棕色填充（视觉延伸） */
+    if (groundY + groundH < screenH) {
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(0, groundY + groundH, screenW, screenH - groundY - groundH);
+    }
   }
 
   /* 绘制天空背景（水平视差滚动，动态平铺适配任意屏幕宽度） */

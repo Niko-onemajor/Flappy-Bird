@@ -1,10 +1,13 @@
 import Emitter from '../libs/tinyemitter';
-import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
+import { SCREEN_WIDTH, SCREEN_HEIGHT, GAME_SCALE, GAME_OFFSET_X, GAME_OFFSET_Y } from '../render';
 import { GROUND, PROP, PLAYER } from '../config';
 
-/* 将屏幕触摸坐标直接返回（没有缩放变换，直接使用屏幕坐标） */
+/* 将屏幕触摸坐标转换为设计分辨率坐标 */
 function toGameCoord(clientX, clientY) {
-  return { x: clientX, y: clientY };
+  return {
+    x: (clientX - GAME_OFFSET_X) / GAME_SCALE,
+    y: (clientY - GAME_OFFSET_Y) / GAME_SCALE,
+  };
 }
 
 export default class GameInfo extends Emitter {
@@ -427,21 +430,6 @@ export default class GameInfo extends Emitter {
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 11px Arial';
       ctx.fillText(`x2 ${Math.ceil(db.multiplierTimer / 60)}s`, SCREEN_WIDTH / 2, barY + yOff - 4);
-    }
-
-    /* 护盾冷却中 */
-    if (db.shieldCooldown > 0) {
-      const yOff = (db.shieldActive ? -22 : 0) + (db.scoreMultiplier > 1 ? -22 : 0);
-      const pct = db.shieldCooldown / 180;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      this._roundRect(ctx, barX, barY + yOff, barW, barH, 5);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(150, 150, 150, 0.6)';
-      this._roundRect(ctx, barX, barY + yOff, barW * pct, barH, 5);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.font = '10px Arial';
-      ctx.fillText(`护盾冷却 ${Math.ceil(db.shieldCooldown / 60)}s`, SCREEN_WIDTH / 2, barY + yOff - 4);
     }
   }
 

@@ -1,5 +1,5 @@
 import './render';
-import { SCREEN_WIDTH, SCREEN_HEIGHT } from './render';
+import { SCREEN_WIDTH, SCREEN_HEIGHT, GAME_SCALE, GAME_OFFSET_X, GAME_OFFSET_Y } from './render';
 import { submitScore, getTopScores } from './api';
 import BackGround from './runtime/background';
 import GameInfo from './runtime/gameinfo';
@@ -577,16 +577,23 @@ export default class Main {
 
   /* ========== 渲染 ========== */
   render() {
-    const cvs = GameGlobal.canvas;
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    /* 1. 背景全屏渲染（无缩放变换，填满 Canvas） */
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.bg.renderFullScreen(ctx);
+    ctx.restore();
+
+    /* 2. 游戏元素在设计分辨率空间内渲染（应用缩放变换） */
+    ctx.save();
+    ctx.setTransform(GAME_SCALE, 0, 0, GAME_SCALE, GAME_OFFSET_X, GAME_OFFSET_Y);
+
     if (this.screenState === SCREEN_STATE.HOME) {
-      this.bg.render(ctx);
       this.gameInfo.renderHome(ctx);
     } else if (this.screenState === SCREEN_STATE.LEADERBOARD) {
-      this.bg.render(ctx);
       this.gameInfo.renderLeaderboard(ctx);
     } else if (this.screenState === SCREEN_STATE.READY) {
-      this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
@@ -594,7 +601,6 @@ export default class Main {
       this.player.render(ctx);
       this.gameInfo.renderReady(ctx);
     } else if (this.screenState === SCREEN_STATE.PAUSED) {
-      this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
@@ -603,7 +609,6 @@ export default class Main {
       this.gameInfo.renderLocal(ctx, this.databus);
       this.gameInfo.renderPauseOverlay(ctx);
     } else if (this.screenState === SCREEN_STATE.COUNTDOWN) {
-      this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
@@ -612,7 +617,6 @@ export default class Main {
       this.gameInfo.renderLocal(ctx, this.databus);
       this.gameInfo.renderCountdown(ctx);
     } else {
-      this.bg.render(ctx);
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));
       this.databus.saws.forEach((s) => s.render(ctx));
@@ -620,6 +624,8 @@ export default class Main {
       this.player.render(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
     }
+
+    ctx.restore();
   }
 
   /* 主循环 */
