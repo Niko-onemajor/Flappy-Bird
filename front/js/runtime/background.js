@@ -71,13 +71,6 @@ export default class BackGround {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, screenW, screenH);
 
-    /* 顶部阴影线 */
-    const shadowGrad = ctx.createLinearGradient(0, 0, 0, 8 * GAME_SCALE);
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.25)');
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadowGrad;
-    ctx.fillRect(0, 0, screenW, 8 * GAME_SCALE);
-
     /* 2. 天空背景图片平铺 - 在地面以上区域 */
     if (gameGroundY > 0) {
       const bgScale = gameGroundY / BG_IMG_H;
@@ -97,15 +90,10 @@ export default class BackGround {
       ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
     }
 
-    /* 4. 地面以下区域用地面图垂直延伸（视觉延伸） */
+    /* 4. 地面以下区域用泥土色填充（视觉延伸） */
     if (groundY + groundH < screenH) {
-      const remainingH = screenH - groundY - groundH;
-      const extraRows = Math.ceil(remainingH / groundH);
-      for (let row = 1; row <= extraRows; row++) {
-        for (let j = 0; j < groundTilesNeeded; j++) {
-          ctx.drawImage(this.baseImg, j * groundTileW - this.baseX * GAME_SCALE, groundY + row * groundH, groundTileW, groundH);
-        }
-      }
+      ctx.fillStyle = '#C49A6C';
+      ctx.fillRect(0, groundY + groundH, screenW, screenH - groundY - groundH);
     }
   }
 
@@ -119,13 +107,6 @@ export default class BackGround {
     for (let i = 0; i < tilesNeeded; i++) {
       ctx.drawImage(this.bgImg, i * w - this.bgOffsetX, 0, w, h);
     }
-
-    /* 顶部阴影线：增强纵深感，模拟天花板/支撑结构 */
-    const shadowGrad = ctx.createLinearGradient(0, 0, 0, 8);
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.25)');
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = shadowGrad;
-    ctx.fillRect(0, 0, SCREEN_WIDTH, 8);
   }
 
   /* 绘制滚动地面 */
@@ -139,5 +120,29 @@ export default class BackGround {
     for (let i = 0; i < tilesNeeded; i++) {
       ctx.drawImage(this.baseImg, i * w - this.baseX, baseY, w, h);
     }
+  }
+
+  /**
+   * 在设计分辨率空间内渲染天花板（水管之上）
+   * 让水管看起来从天花板结构中伸出
+   */
+  renderCeiling(ctx) {
+    const ceilingH = 30;
+    /* 天花板主体渐变 */
+    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, ceilingH);
+    ceilingGrad.addColorStop(0, '#4A4A4A');
+    ceilingGrad.addColorStop(1, '#6B6B6B');
+    ctx.fillStyle = ceilingGrad;
+    ctx.fillRect(0, 0, SCREEN_WIDTH, ceilingH);
+    /* 天花板底部阴影过渡 */
+    const ceilShadow = ctx.createLinearGradient(0, ceilingH - 6, 0, ceilingH);
+    ceilShadow.addColorStop(0, 'rgba(0,0,0,0)');
+    ceilShadow.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.fillStyle = ceilShadow;
+    ctx.fillRect(0, ceilingH - 6, SCREEN_WIDTH, 6);
+    /* 天花板装饰线 */
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, 8, SCREEN_WIDTH, 1);
+    ctx.fillRect(0, 16, SCREEN_WIDTH, 1);
   }
 }
