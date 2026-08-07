@@ -46,11 +46,11 @@ export default class GameInfo extends Emitter {
     this._scrollStartY = 0;          /* 触摸起始时的滚动位置 */
     this._countdownValue = 0;        /* 倒计时秒数 */
 
-    /* 暂停按钮（左上角） */
+    /* 暂停按钮（左上角，音效按钮右边） */
     this.pauseBtnArea = {
-      startX: 10,
+      startX: 50,
       startY: 8,
-      endX: 50,
+      endX: 90,
       endY: 42,
     };
 
@@ -107,12 +107,12 @@ export default class GameInfo extends Emitter {
     this.heartImg = wx.createImage();
     this.heartImg.src = 'images/heart_full.png';
 
-    /* 音效开关按钮（右上角） */
+    /* 音效开关按钮（左上角，暂停按钮左边） */
     this._soundMuted = false;
     this.soundBtnArea = {
-      startX: SCREEN_WIDTH - 44,
+      startX: 10,
       startY: 8,
-      endX: SCREEN_WIDTH - 8,
+      endX: 44,
       endY: 42,
     };
   }
