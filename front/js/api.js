@@ -19,31 +19,42 @@ console.log(`[API] 后端地址: ${API_BASE}`);
 console.log('[API] 如需真机调试，请修改 api.js 第 8 行 DEV_IP 为电脑 IP');
 
 /**
- * 封装 wx.request 为 Promise
+ * 封装 wx.request 为 Promise（带自动重试）
+ * @param {number} [retries=2] - 失败重试次数
+ * @param {number} [delay=1000] - 重试间隔(ms)
  */
-function request(method, path, data) {
+function request(method, path, data, retries = 2, delay = 1000) {
   const url = API_BASE + path;
   return new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      method,
-      header: { 'Content-Type': 'application/json' },
-      data,
-      timeout: 5000,  /* 5秒超时 */
-      success(res) {
-        if (res.statusCode === 200) {
-          resolve(res.data);
-        } else {
-          console.error(`[API] ${method} ${url} → HTTP ${res.statusCode}:`, res.data);
-          reject(res.data);
-        }
-      },
-      fail(err) {
-        console.error(`[API] ${method} ${url} 失败:`, JSON.stringify(err));
-        console.error('[API] 可能原因: 1)后端未启动 2)DEV_IP 未改为电脑IP 3)防火墙拦截 4)不在同一WiFi');
-        reject(err);
-      },
-    });
+    function attempt(n) {
+      wx.request({
+        url,
+        method,
+        header: { 'Content-Type': 'application/json' },
+        data,
+        timeout: 5000,
+        success(res) {
+          if (res.statusCode === 200) {
+            resolve(res.data);
+          } else {
+            console.error(`[API] ${method} ${url} → HTTP ${res.statusCode}:`, res.data);
+            reject(res.data);
+          }
+        },
+        fail(err) {
+          console.error(`[API] ${method} ${url} 失败(第${retries - n + 1}次):`, JSON.stringify(err));
+          if (n > 0) {
+            console.log(`[API] ${delay}ms 后重试...`);
+            setTimeout(() => attempt(n - 1), delay);
+          } else {
+            console.error('[API] 重试耗尽，请求彻底失败');
+            console.error('[API] 可能原因: 1)后端未启动 2)DEV_IP 未改为电脑IP 3)防火墙拦截 4)不在同一WiFi');
+            reject(err);
+          }
+        },
+      });
+    }
+    attempt(retries);
   });
 }
 

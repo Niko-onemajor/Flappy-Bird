@@ -98,8 +98,8 @@ export default class Rocket extends Sprite {
     this.y += Math.sin(this.angle) * this.speed;
     this.trailPhase += 0.15;
 
-    /* 生成新尾气粒子（上限50个防止性能问题） */
-    if (this.exhaust.length < 50 && (this.state === 'flying' || (this.state === 'tracking' && this.trackTimer < 60))) {
+    /* 生成新尾气粒子（上限30个防止性能问题） */
+    if (this.exhaust.length < 30 && (this.state === 'flying' || (this.state === 'tracking' && this.trackTimer < 60))) {
       const cx = this.x + this.width / 2;
       const cy = this.y + this.height / 2;
       /* 火箭尾部反方向生成粒子 */
@@ -136,18 +136,20 @@ export default class Rocket extends Sprite {
     const cx = this.x + this.width / 2;
     const cy = this.y + this.height / 2;
 
-    /* 绘制尾气粒子（世界坐标系） */
+    /* 绘制尾气粒子（世界坐标系）- 使用纯色替代渐变，大幅减少 createRadialGradient 调用 */
     ctx.save();
     for (const p of this.exhaust) {
       if (p.alpha < 0.05) continue;
-      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-      gradient.addColorStop(0, `rgba(255, 255, 200, ${p.alpha * 0.8})`);
-      gradient.addColorStop(0.3, `rgba(255, 160, 50, ${p.alpha * 0.6})`);
-      gradient.addColorStop(0.7, `rgba(255, 80, 20, ${p.alpha * 0.4})`);
-      gradient.addColorStop(1, `rgba(200, 30, 0, 0)`);
-      ctx.fillStyle = gradient;
+      const a = p.alpha * 0.6;
+      /* 外焰（橙色） */
+      ctx.fillStyle = `rgba(255, 140, 40, ${a})`;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      /* 内焰（亮黄色，更小） */
+      ctx.fillStyle = `rgba(255, 220, 100, ${a * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * 0.3, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

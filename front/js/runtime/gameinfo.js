@@ -2,6 +2,11 @@ import Emitter from '../libs/tinyemitter';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../render';
 import { GROUND, PROP, PLAYER } from '../config';
 
+/* 将屏幕触摸坐标直接返回（没有缩放变换，直接使用屏幕坐标） */
+function toGameCoord(clientX, clientY) {
+  return { x: clientX, y: clientY };
+}
+
 export default class GameInfo extends Emitter {
   constructor() {
     super();
@@ -673,28 +678,30 @@ export default class GameInfo extends Emitter {
   touchEventHandler(event) {
     if (!event.touches || event.touches.length === 0) return;
     const { clientX, clientY } = event.touches[0];
-    console.log('[Touch] screenState:', GameGlobal.screenState, 'pos:', clientX, clientY);
+    /* 转换到游戏世界坐标 */
+    const game = toGameCoord(clientX, clientY);
+    console.log('[Touch] screenState:', GameGlobal.screenState, 'screen:', clientX, clientY, 'game:', game.x.toFixed(1), game.y.toFixed(1));
 
     /* 主页：点击开始按钮 */
     if (GameGlobal.screenState === 'home') {
-      console.log('[Touch] 主页触摸:', clientX, clientY,
+      console.log('[Touch] 主页触摸:', game.x, game.y,
         '开始按钮:', this.homeBtnArea.startX, this.homeBtnArea.startY,
         '排行按钮:', this.leaderboardBtnArea.startX, this.leaderboardBtnArea.startY);
       if (
-        clientX >= this.homeBtnArea.startX &&
-        clientX <= this.homeBtnArea.endX &&
-        clientY >= this.homeBtnArea.startY &&
-        clientY <= this.homeBtnArea.endY
+        game.x >= this.homeBtnArea.startX &&
+        game.x <= this.homeBtnArea.endX &&
+        game.y >= this.homeBtnArea.startY &&
+        game.y <= this.homeBtnArea.endY
       ) {
         console.log('[Touch] → 点击开始游戏');
         this.emit('start');
         return;
       }
       if (
-        clientX >= this.leaderboardBtnArea.startX &&
-        clientX <= this.leaderboardBtnArea.endX &&
-        clientY >= this.leaderboardBtnArea.startY &&
-        clientY <= this.leaderboardBtnArea.endY
+        game.x >= this.leaderboardBtnArea.startX &&
+        game.x <= this.leaderboardBtnArea.endX &&
+        game.y >= this.leaderboardBtnArea.startY &&
+        game.y <= this.leaderboardBtnArea.endY
       ) {
         console.log('[Touch] → 点击排行榜');
         this.emit('showLeaderboard');
@@ -705,14 +712,14 @@ export default class GameInfo extends Emitter {
 
     /* 排行榜：记录起始触摸位置用于滚动 */
     if (GameGlobal.screenState === 'leaderboard') {
-      this._touchStartY = clientY;
+      this._touchStartY = game.y;
       this._scrollStartY = this._leaderboardScrollY;
-      console.log('[Leaderboard] touchStart y=', clientY, 'scrollStart=', this._scrollStartY);
+      console.log('[Leaderboard] touchStart y=', game.y, 'scrollStart=', this._scrollStartY);
       if (
-        clientX >= this.backBtnArea.startX &&
-        clientX <= this.backBtnArea.endX &&
-        clientY >= this.backBtnArea.startY &&
-        clientY <= this.backBtnArea.endY
+        game.x >= this.backBtnArea.startX &&
+        game.x <= this.backBtnArea.endX &&
+        game.y >= this.backBtnArea.startY &&
+        game.y <= this.backBtnArea.endY
       ) {
         this.emit('backToHome');
       }
@@ -724,10 +731,10 @@ export default class GameInfo extends Emitter {
       /* 检查暂停按钮 */
       if (GameGlobal.screenState === 'playing') {
         if (
-          clientX >= this.pauseBtnArea.startX &&
-          clientX <= this.pauseBtnArea.endX &&
-          clientY >= this.pauseBtnArea.startY &&
-          clientY <= this.pauseBtnArea.endY
+          game.x >= this.pauseBtnArea.startX &&
+          game.x <= this.pauseBtnArea.endX &&
+          game.y >= this.pauseBtnArea.startY &&
+          game.y <= this.pauseBtnArea.endY
         ) {
           this.emit('pause');
           return;
@@ -740,19 +747,19 @@ export default class GameInfo extends Emitter {
       if (isOver) {
         /* 游戏结束，检查按钮点击 */
         if (
-          clientX >= this.btnArea.startX &&
-          clientX <= this.btnArea.endX &&
-          clientY >= this.btnArea.startY &&
-          clientY <= this.btnArea.endY
+          game.x >= this.btnArea.startX &&
+          game.x <= this.btnArea.endX &&
+          game.y >= this.btnArea.startY &&
+          game.y <= this.btnArea.endY
         ) {
           this.emit('restart');
           return;
         }
         if (
-          clientX >= this.menuBtnArea.startX &&
-          clientX <= this.menuBtnArea.endX &&
-          clientY >= this.menuBtnArea.startY &&
-          clientY <= this.menuBtnArea.endY
+          game.x >= this.menuBtnArea.startX &&
+          game.x <= this.menuBtnArea.endX &&
+          game.y >= this.menuBtnArea.startY &&
+          game.y <= this.menuBtnArea.endY
         ) {
           this.emit('backToHome');
         }
@@ -765,19 +772,19 @@ export default class GameInfo extends Emitter {
     /* 暂停状态：点击继续或结束 */
     if (GameGlobal.screenState === 'paused') {
       if (
-        clientX >= this.resumeBtnArea.startX &&
-        clientX <= this.resumeBtnArea.endX &&
-        clientY >= this.resumeBtnArea.startY &&
-        clientY <= this.resumeBtnArea.endY
+        game.x >= this.resumeBtnArea.startX &&
+        game.x <= this.resumeBtnArea.endX &&
+        game.y >= this.resumeBtnArea.startY &&
+        game.y <= this.resumeBtnArea.endY
       ) {
         this.emit('resume');
         return;
       }
       if (
-        clientX >= this.quitBtnArea.startX &&
-        clientX <= this.quitBtnArea.endX &&
-        clientY >= this.quitBtnArea.startY &&
-        clientY <= this.quitBtnArea.endY
+        game.x >= this.quitBtnArea.startX &&
+        game.x <= this.quitBtnArea.endX &&
+        game.y >= this.quitBtnArea.startY &&
+        game.y <= this.quitBtnArea.endY
       ) {
         this.emit('quitToHome');
       }
@@ -791,20 +798,20 @@ export default class GameInfo extends Emitter {
     if (!GameGlobal.databus || !GameGlobal.databus.isGameOver) return;
 
     if (
-      clientX >= this.btnArea.startX &&
-      clientX <= this.btnArea.endX &&
-      clientY >= this.btnArea.startY &&
-      clientY <= this.btnArea.endY
+      game.x >= this.btnArea.startX &&
+      game.x <= this.btnArea.endX &&
+      game.y >= this.btnArea.startY &&
+      game.y <= this.btnArea.endY
     ) {
       this.emit('restart');
       return;
     }
 
     if (
-      clientX >= this.menuBtnArea.startX &&
-      clientX <= this.menuBtnArea.endX &&
-      clientY >= this.menuBtnArea.startY &&
-      clientY <= this.menuBtnArea.endY
+      game.x >= this.menuBtnArea.startX &&
+      game.x <= this.menuBtnArea.endX &&
+      game.y >= this.menuBtnArea.startY &&
+      game.y <= this.menuBtnArea.endY
     ) {
       this.emit('backToHome');
     }
@@ -818,12 +825,15 @@ export default class GameInfo extends Emitter {
     if (this._touchStartY == null) return;
 
     const { clientY } = event.touches[0];
-    /* 从起始触摸位置计算滑动偏移 */
-    const delta = this._touchStartY - clientY;
+    /* 滚动位移和屏幕物理像素成正比，保持滚动手感一致 */
+    const game = toGameCoord(0, clientY);
+    const delta = this._touchStartY - game.y;
     this._leaderboardScrollY = this._scrollStartY + delta;
     this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
 
-    console.log('[Leaderboard] touchMove clientY=', clientY, 'delta=', delta.toFixed(1), 'scrollY=', this._leaderboardScrollY.toFixed(1));
+    if (GameGlobal.DEBUG_COLLISION) {
+      console.log('[Leaderboard] touchMove clientY=', clientY, 'delta=', delta.toFixed(1), 'scrollY=', this._leaderboardScrollY.toFixed(1));
+    }
   }
 
   /* 触摸结束，清除状态 */

@@ -1,122 +1,126 @@
 /**
  * 音效管理器
  * 音量平衡：背景音乐 < 音效反馈，避免互相压盖
+ * 延迟创建音频上下文，减少启动卡顿
  */
 import { AUDIO_VOLUME } from './config';
 
+/* 音频配置表 */
+const AUDIO_CONFIG = {
+  bgm: { src: 'audio/bgm.mp3', volume: AUDIO_VOLUME.bgm, loop: true },
+  wing: { src: 'audio/wing.mp3', volume: AUDIO_VOLUME.wing },
+  point: { src: 'audio/point.mp3', volume: AUDIO_VOLUME.point },
+  hit: { src: 'audio/hit.mp3', volume: AUDIO_VOLUME.hit },
+  die: { src: 'audio/die.mp3', volume: AUDIO_VOLUME.die },
+  swoosh: { src: 'audio/swoosh.mp3', volume: AUDIO_VOLUME.swoosh },
+  shieldBreak: { src: 'audio/shield_break.mp3', volume: AUDIO_VOLUME.shieldBreak },
+  shieldPickup: { src: 'audio/shield_pickup.mp3', volume: AUDIO_VOLUME.shieldPickup },
+  scoreX2: { src: 'audio/score_x2.mp3', volume: AUDIO_VOLUME.scoreX2 },
+  fuseBurn: { src: 'audio/fuse_burn.mp3', volume: AUDIO_VOLUME.fuseBurn },
+  rocketFly: { src: 'audio/rocket_fly.mp3', volume: AUDIO_VOLUME.rocketFly },
+};
+
 export default class Sound {
   constructor() {
-    /* 背景音乐（循环播放，音量最低） */
-    this.bgm = wx.createInnerAudioContext();
-    this.bgm.src = 'audio/bgm.mp3';
-    this.bgm.loop = true;
-    this.bgm.volume = AUDIO_VOLUME.bgm;
-
-    /* 翅膀拍打音效 */
-    this.wing = this._createAudio('audio/wing.mp3', AUDIO_VOLUME.wing);
-
-    /* 得分音效 */
-    this.point = this._createAudio('audio/point.mp3', AUDIO_VOLUME.point);
-
-    /* 碰撞音效 */
-    this.hit = this._createAudio('audio/hit.mp3', AUDIO_VOLUME.hit);
-
-    /* 死亡音效 */
-    this.die = this._createAudio('audio/die.mp3', AUDIO_VOLUME.die);
-
-    /* 俯冲音效 */
-    this.swoosh = this._createAudio('audio/swoosh.mp3', AUDIO_VOLUME.swoosh);
-
-    /* 护盾破裂音效 */
-    this.shieldBreak = this._createAudio('audio/shield_break.mp3', AUDIO_VOLUME.shieldBreak);
-
-    /* 护盾拾取音效 */
-    this.shieldPickup = this._createAudio('audio/shield_pickup.mp3', AUDIO_VOLUME.shieldPickup);
-
-    /* 双倍分数拾取音效 */
-    this.scoreX2 = this._createAudio('audio/score_x2.mp3', AUDIO_VOLUME.scoreX2);
-
-    /* 火箭引信点燃音效（只播开头2秒引信声） */
-    this.fuseBurn = this._createAudio('audio/fuse_burn.mp3', AUDIO_VOLUME.fuseBurn);
-
-    /* 火箭飞行音效 */
-    this.rocketFly = this._createAudio('audio/rocket_fly.mp3', AUDIO_VOLUME.rocketFly);
+    this._cache = {};
+    this._fuseBurnPlaying = false;
+    this._rocketFlyPlaying = false;
   }
 
-  _createAudio(src, volume) {
-    const audio = wx.createInnerAudioContext();
-    audio.src = src;
-    audio.volume = volume;
-    return audio;
+  /* 延迟创建并缓存音频上下文 */
+  _getAudio(key) {
+    if (!this._cache[key]) {
+      const cfg = AUDIO_CONFIG[key];
+      if (!cfg) return null;
+      const audio = wx.createInnerAudioContext();
+      audio.src = cfg.src;
+      audio.volume = cfg.volume;
+      if (cfg.loop) audio.loop = true;
+      this._cache[key] = audio;
+    }
+    return this._cache[key];
   }
 
   playBgm() {
-    this.bgm.stop();
-    this.bgm.play();
+    const bgm = this._getAudio('bgm');
+    bgm.stop();
+    bgm.play();
   }
 
   stopBgm() {
-    this.bgm.stop();
+    const bgm = this._cache.bgm;
+    if (bgm) bgm.stop();
   }
 
   pauseBgm() {
-    this.bgm.pause();
+    const bgm = this._cache.bgm;
+    if (bgm) bgm.pause();
   }
 
   resumeBgm() {
-    this.bgm.play();
+    const bgm = this._cache.bgm;
+    if (bgm) bgm.play();
   }
 
   playWing() {
-    this.wing.stop();
-    this.wing.play();
+    const a = this._getAudio('wing');
+    a.stop();
+    a.play();
   }
 
   playPoint() {
-    this.point.stop();
-    this.point.play();
+    const a = this._getAudio('point');
+    a.stop();
+    a.play();
   }
 
   playHit() {
-    this.hit.stop();
-    this.hit.play();
+    const a = this._getAudio('hit');
+    a.stop();
+    a.play();
   }
 
   playDie() {
-    this.die.stop();
-    this.die.play();
+    const a = this._getAudio('die');
+    a.stop();
+    a.play();
   }
 
   playSwoosh() {
-    this.swoosh.stop();
-    this.swoosh.play();
+    const a = this._getAudio('swoosh');
+    a.stop();
+    a.play();
   }
 
   playShieldBreak() {
-    this.shieldBreak.stop();
-    this.shieldBreak.play();
+    const a = this._getAudio('shieldBreak');
+    a.stop();
+    a.play();
   }
 
   playShieldPickup() {
-    this.shieldPickup.stop();
-    this.shieldPickup.play();
+    const a = this._getAudio('shieldPickup');
+    a.stop();
+    a.play();
   }
 
   playScoreX2() {
-    this.scoreX2.stop();
-    this.scoreX2.play();
+    const a = this._getAudio('scoreX2');
+    a.stop();
+    a.play();
   }
 
   /* 火箭引信点燃：只播一次，不重叠 */
   playFuseBurn() {
     if (this._fuseBurnPlaying) return;
     this._fuseBurnPlaying = true;
-    this.fuseBurn.seek(0);
-    this.fuseBurn.play();
+    const a = this._getAudio('fuseBurn');
+    a.seek(0);
+    a.play();
     /* 2秒后停止，只取引信部分 */
     setTimeout(() => {
       try {
-        this.fuseBurn.stop();
+        a.stop();
         this._fuseBurnPlaying = false;
       } catch (e) { /* ignore */ }
     }, 2000);
@@ -126,34 +130,33 @@ export default class Sound {
   playRocketFly() {
     if (this._rocketFlyPlaying) return;
     this._rocketFlyPlaying = true;
-    this.rocketFly.seek(0);
-    this.rocketFly.play();
+    const a = this._getAudio('rocketFly');
+    a.seek(0);
+    a.play();
   }
 
   stopRocketFly() {
-    this.rocketFly.stop();
+    const a = this._cache.rocketFly;
+    if (a) a.stop();
     this._rocketFlyPlaying = false;
   }
 
   stopFuseBurn() {
-    this.fuseBurn.stop();
+    const a = this._cache.fuseBurn;
+    if (a) a.stop();
     this._fuseBurnPlaying = false;
   }
 
   /* 停止所有音效 */
   stopAll() {
     this.stopBgm();
-    this.wing.stop();
-    this.point.stop();
-    this.hit.stop();
-    this.die.stop();
-    this.swoosh.stop();
-    this.shieldBreak.stop();
-    this.shieldPickup.stop();
-    this.scoreX2.stop();
-    this.fuseBurn.stop();
+    Object.keys(this._cache).forEach((key) => {
+      const a = this._cache[key];
+      if (a && a.stop) {
+        try { a.stop(); } catch (e) { /* ignore */ }
+      }
+    });
     this._fuseBurnPlaying = false;
-    this.rocketFly.stop();
     this._rocketFlyPlaying = false;
   }
 }

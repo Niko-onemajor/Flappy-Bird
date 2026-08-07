@@ -1,1 +1,14 @@
-{"deviceOrientation":"landscape","audits":{"enable":true,"autoStart":true,"systemDescription":"ZhEYhzsSnYcFVTNUFl5r"}}
+{
+  "deviceOrientation": "landscape",
+  "audits": {
+    "enable": true,
+    "autoStart": true,
+    "systemDescription": "ZhEYhzsSnYcFVTNUFl5r"
+  },
+  "subpackages": [
+    {
+      "name": "audio",
+      "root": "audio/"
+    }
+  ]
+}

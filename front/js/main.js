@@ -295,14 +295,12 @@ export default class Main {
       this._createPropForPipe(pipe);
       this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
       this._pipesSinceLastProp = 0;
-      console.log(`[Prop] 保底生成 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
     }
     /* 随机生成：冷却结束后概率触发 */
     else if (this.propTimer <= 0 && Math.random() < propChance && this.databus.props.length < 3) {
       this._createPropForPipe(pipe);
       this.propTimer = PROP_COOLDOWN_MIN + Math.floor(Math.random() * 60);
       this._pipesSinceLastProp = 0;
-      console.log(`[Prop] 随机生成 propTimer=${this.propTimer} 场上=${this.databus.props.length}`);
     } else if (this.propTimer <= 0) {
       this.propTimer = 30;  /* 概率未命中，0.5秒后重试 */
     }
@@ -311,7 +309,6 @@ export default class Main {
     if (this.databus.score >= SAW_MIN_SCORE && Math.random() < SAW_SPAWN_CHANCE
         && this.databus.saws.length < 8) {
       this._createSawForPipe(pipe, speed);
-      console.log(`[Saw] 触发 score=${this.databus.score} saws=${this.databus.saws.length}`);
     }
   }
 
@@ -361,54 +358,39 @@ export default class Main {
 
   /* 火箭独立生成：每帧调用，12分后开始，从右侧进入，2秒追踪后锁定发射 */
   _tryGenerateRocket() {
-    const frame = this.databus.frame;
     const score = this.databus.score;
 
     if (score < ROCKET_MIN_SCORE) {
-      if (frame % 60 === 0) {
-        console.log(`[Rocket] frame=${frame} 等待分数达标 score=${score}/${ROCKET_MIN_SCORE}`);
-      }
       return;
     }
 
     const { maxRockets, cooldown } = this._getRocketLevel(score);
 
     if (this.databus.rockets.length >= maxRockets) {
-      if (frame % 60 === 0) {
-        console.log(`[Rocket] frame=${frame} 场上已满 rockets=${this.databus.rockets.length}/${maxRockets} 跳过`);
-      }
       return;
     }
 
     this.rocketTimer--;
     if (this.rocketTimer > 0) {
-      if (this.rocketTimer % 20 === 0) {
-        console.log(`[Rocket] frame=${frame} 冷却中 timer=${this.rocketTimer} rockets=${this.databus.rockets.length}/${maxRockets}`);
-      }
       return;
     }
-
-    console.log(`[Rocket] frame=${frame} 冷却完毕! 尝试生成 score=${score} rockets=${this.databus.rockets.length}/${maxRockets}`);
 
     const { speed } = this._getDifficulty();
     const rocket = this.databus.pool.getItemByClass('rocket', Rocket);
     if (!rocket) {
-      console.error(`[Rocket] frame=${frame} 对象池获取失败!`);
       this.rocketTimer = 10;
       return;
     }
     try {
       rocket.init(speed);
       this.databus.rockets.push(rocket);
-      console.log(`[Rocket] frame=${frame} 生成成功! speed=${speed.toFixed(1)} x=${rocket.x.toFixed(1)} y=${rocket.y.toFixed(1)} total=${this.databus.rockets.length}`);
     } catch (e) {
-      console.error(`[Rocket] frame=${frame} init崩溃:`, e);
+      console.error('[Rocket] init崩溃:', e);
       this.rocketTimer = 10;
       return;
     }
 
     this.rocketTimer = cooldown;
-    console.log(`[Rocket] frame=${frame} 重置冷却 timer=${this.rocketTimer}`);
   }
 
   _updatePipes() {
@@ -601,8 +583,8 @@ export default class Main {
 
   /* ========== 渲染 ========== */
   render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    const cvs = GameGlobal.canvas;
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
     if (this.screenState === SCREEN_STATE.HOME) {
       this.bg.render(ctx);
       this.gameInfo.renderHome(ctx);
