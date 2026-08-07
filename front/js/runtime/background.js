@@ -64,14 +64,26 @@ export default class BackGround {
     /* 计算游戏地面在屏幕上的位置 */
     const gameGroundY = (SCREEN_HEIGHT - GROUND.HEIGHT) * GAME_SCALE + GAME_OFFSET_Y;
 
-    /* 1. 天空渐变 - 填满全屏背景 */
-    const gradient = ctx.createLinearGradient(0, 0, 0, screenH);
-    gradient.addColorStop(0, '#4DC9F6');
-    gradient.addColorStop(1, '#87CEEB');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, screenW, screenH);
+    /* 计算地面位置 */
+    const groundH = GROUND.HEIGHT * GAME_SCALE;
+    const groundY = Math.min(gameGroundY, screenH - groundH);
 
-    /* 2. 天空背景图片平铺 - 在地面以上区域 */
+    /* 1. 地面以下区域先用泥土色填充（防止浮点精度缝隙透出蓝色） */
+    if (groundY < screenH) {
+      ctx.fillStyle = '#DED895';
+      ctx.fillRect(0, groundY, screenW, screenH - groundY);
+    }
+
+    /* 2. 天空渐变 - 仅填充地面以上区域 */
+    if (groundY > 0) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, screenH);
+      gradient.addColorStop(0, '#4DC9F6');
+      gradient.addColorStop(1, '#87CEEB');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, screenW, groundY);
+    }
+
+    /* 3. 天空背景图片平铺 - 在地面以上区域 */
     if (gameGroundY > 0) {
       const bgScale = gameGroundY / BG_IMG_H;
       const bgTileW = BG_IMG_W * bgScale;
@@ -81,19 +93,11 @@ export default class BackGround {
       }
     }
 
-    /* 3. 地面平铺 - 从游戏地面位置开始，延伸到屏幕底部 */
-    const groundH = GROUND.HEIGHT * GAME_SCALE;
-    const groundY = Math.min(gameGroundY, screenH - groundH);
+    /* 4. 地面平铺 - 覆盖泥土色区域 */
     const groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
     const groundTilesNeeded = Math.ceil(screenW / groundTileW) + 2;
     for (let i = 0; i < groundTilesNeeded; i++) {
       ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
-    }
-
-    /* 4. 地面以下区域用泥土色填充（视觉延伸） */
-    if (groundY + groundH < screenH) {
-      ctx.fillStyle = '#DED895';
-      ctx.fillRect(0, groundY + groundH, screenW, screenH - groundY - groundH);
     }
   }
 
