@@ -42,6 +42,19 @@ export default class Prop extends Sprite {
     super('', PROP_SIZE, PROP_SIZE);
   }
 
+  /** 对象池回收时清理残留状态 */
+  reset() {
+    this.type = 'shield';
+    this.collected = false;
+    this.animPhase = 0;
+    this.speed = 3;
+    this._parentPipe = null;
+    this.visible = false;
+    this.isActive = false;
+    this.x = 0;
+    this.y = 0;
+  }
+
   /* 先生成水管，再基于水管精确计算道具坐标 */
   init(pipe) {
     this.type = PROP_TYPES[Math.floor(Math.random() * PROP_TYPES.length)];

@@ -104,53 +104,20 @@ export default class Sound {
     if (bgm) bgm.play();
   }
 
-  playWing() {
-    const a = this._getAudio('wing');
-    a.stop();
-    a.play();
+  /** 简单音效：stop + play 模板 */
+  _playSimple(key) {
+    const a = this._getAudio(key);
+    if (a) { a.stop(); a.play(); }
   }
 
-  playPoint() {
-    const a = this._getAudio('point');
-    a.stop();
-    a.play();
-  }
-
-  playHit() {
-    const a = this._getAudio('hit');
-    a.stop();
-    a.play();
-  }
-
-  playDie() {
-    const a = this._getAudio('die');
-    a.stop();
-    a.play();
-  }
-
-  playSwoosh() {
-    const a = this._getAudio('swoosh');
-    a.stop();
-    a.play();
-  }
-
-  playShieldBreak() {
-    const a = this._getAudio('shieldBreak');
-    a.stop();
-    a.play();
-  }
-
-  playShieldPickup() {
-    const a = this._getAudio('shieldPickup');
-    a.stop();
-    a.play();
-  }
-
-  playScoreX2() {
-    const a = this._getAudio('scoreX2');
-    a.stop();
-    a.play();
-  }
+  playWing() { this._playSimple('wing'); }
+  playPoint() { this._playSimple('point'); }
+  playHit() { this._playSimple('hit'); }
+  playDie() { this._playSimple('die'); }
+  playSwoosh() { this._playSimple('swoosh'); }
+  playShieldBreak() { this._playSimple('shieldBreak'); }
+  playShieldPickup() { this._playSimple('shieldPickup'); }
+  playScoreX2() { this._playSimple('scoreX2'); }
 
   /* 火箭引信点燃：只播一次，不重叠 */
   playFuseBurn() {

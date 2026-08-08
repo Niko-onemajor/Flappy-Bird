@@ -36,8 +36,12 @@ export default class Pool {
   /**
    * 将对象回收到对象池
    * 方便后续继续使用
+   * 回收时自动调用 instance.reset()（若存在），清理残留状态
    */
   recover(name, instance) {
+    if (typeof instance.reset === 'function') {
+      instance.reset();
+    }
     this.getPoolBySign(name).push(instance);
   }
 }

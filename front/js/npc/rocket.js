@@ -244,9 +244,23 @@ export default class Rocket extends Sprite {
     return bx + bw > rx && bx < rx + rw && by + bh > ry && by < ry + rh;
   }
 
+  /** 对象池回收时清理残留状态 */
+  reset() {
+    this.exhaust = [];
+    this._flameGrad = null;
+    this._lastFlameLen = 0;
+    this.angle = 0;
+    this.targetX = 0;
+    this.targetY = 0;
+    this.state = 'tracking';
+    this.trackTimer = 0;
+    this._trackedX = 0;
+    this._trackedY = 0;
+  }
+
   /* 火箭移除时清理音效 */
   cleanup() {
-    this.exhaust = [];
+    this.reset();
     if (GameGlobal.sound) {
       GameGlobal.sound.stopRocketFly();
       GameGlobal.sound.stopFuseBurn();

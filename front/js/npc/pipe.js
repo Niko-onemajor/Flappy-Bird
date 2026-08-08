@@ -41,6 +41,22 @@ export default class Pipe extends Sprite {
     this.pipeImg = PIPE_GREEN_IMG;
   }
 
+  /** 对象池回收时清理残留状态 */
+  reset() {
+    this.scored = false;
+    this.gap = 130;
+    this.speed = 3;
+    this.pipeType = PIPE_TYPE.NORMAL;
+    this.baseGapY = 0;
+    this.movePhase = 0;
+    this.hasTop = true;
+    this.hasBottom = true;
+    this.visible = false;
+    this.isActive = false;
+    this.x = 0;
+    this.y = 0;
+  }
+
   init(gap = 130, speed = 3) {
     this.visible = true;
     this.isActive = true;

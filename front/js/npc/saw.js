@@ -16,6 +16,17 @@ export default class Saw extends Sprite {
     super('', SAW_SIZE, SAW_SIZE);
   }
 
+  /** 对象池回收时清理残留状态 */
+  reset() {
+    this.rotation = 0;
+    this.speed = 3;
+    this._hostPipe = null;
+    this.visible = false;
+    this.isActive = false;
+    this.x = 0;
+    this.y = 0;
+  }
+
   init(speed, pipe, prevPipe) {
     this.visible = true;
     this.isActive = true;

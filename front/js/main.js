@@ -10,7 +10,7 @@ import Prop from './npc/prop';
 import Saw from './npc/saw';
 import Rocket from './npc/rocket';
 import DataBus from './databus';
-import { PLAYER, GROUND, PIPE, PROP as PROP_CFG, SAW as SAW_CFG, ROCKET as ROCKET_CFG } from './config';
+import { PLAYER, PIPE, SAW as SAW_CFG, ROCKET as ROCKET_CFG } from './config';
 
 const ctx = canvas.getContext('2d');
 
@@ -48,7 +48,6 @@ const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
 const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
-const ROCKET_SPAWN_CHANCE = ROCKET_CFG.SPAWN_CHANCE;
 /* 火箭动态难度：maxRockets 和 cooldown 由 _getRocketLevel 根据分数计算 */
 
 /* 碰撞箱可视化调试开关 */
@@ -559,22 +558,23 @@ export default class Main {
     if (this.propTimer > 0) this.propTimer--;
   }
 
+  /** 应用震动和屏幕抖动反馈（根据玩家设置） */
+  _applyHitFeedback() {
+    if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
+      wx.vibrateShort({ type: 'light' });
+    }
+    if (GameGlobal.settings && GameGlobal.settings.screenShake) {
+      this._shakeTimer = Math.max(this._shakeTimer, 8);
+      this._shakeIntensity = Math.max(this._shakeIntensity, 6);
+    }
+  }
+
   /* 玩家受伤：扣一条命，短暂无敌 */
   _onPlayerHit() {
     this.databus.lives--;
     if (GameGlobal.DEBUG_LOG) console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
     GameGlobal.sound.playHit();
-
-    /* 振动反馈（根据设置） */
-    if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
-      wx.vibrateShort({ type: 'light' });
-    }
-
-    /* 屏幕抖动（根据设置） */
-    if (GameGlobal.settings && GameGlobal.settings.screenShake) {
-      this._shakeTimer = 8;
-      this._shakeIntensity = 6;
-    }
+    this._applyHitFeedback();
 
     if (this.databus.lives <= 0) {
       this.player.destroy();
@@ -590,11 +590,10 @@ export default class Main {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     /* 屏幕抖动偏移 */
-    /* 检查来自 player/index.js 地面碰撞的抖动请求 */
-    if (GameGlobal._requestScreenShake) {
-      this._shakeTimer = Math.max(this._shakeTimer, GameGlobal._requestScreenShake.timer);
-      this._shakeIntensity = Math.max(this._shakeIntensity, GameGlobal._requestScreenShake.intensity);
-      GameGlobal._requestScreenShake = null;
+    /* 检查来自 player/index.js 地面碰撞的抖动/振动请求 */
+    if (GameGlobal._requestPlayerHitFeedback) {
+      this._applyHitFeedback();
+      GameGlobal._requestPlayerHitFeedback = false;
     }
     const shakeX = this._shakeTimer > 0 ? (Math.random() - 0.5) * this._shakeIntensity : 0;
     const shakeY = this._shakeTimer > 0 ? (Math.random() - 0.5) * this._shakeIntensity : 0;

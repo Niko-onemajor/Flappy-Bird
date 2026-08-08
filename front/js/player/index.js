@@ -113,14 +113,8 @@ export default class Player extends Sprite {
 
       db.lives--;
       GameGlobal.sound.playHit();
-      /* 振动反馈（根据设置） */
-      if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
-        wx.vibrateShort({ type: 'light' });
-      }
-      /* 屏幕抖动（根据设置）——通过全局变量通知 main.js */
-      if (GameGlobal.settings && GameGlobal.settings.screenShake) {
-        GameGlobal._requestScreenShake = { timer: 8, intensity: 6 };
-      }
+      /* 统一通过全局标记通知 main.js 处理振动和屏幕抖动 */
+      GameGlobal._requestPlayerHitFeedback = true;
       if (GameGlobal.DEBUG_LOG) console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
       if (db.lives <= 0) {
         this.destroy();
