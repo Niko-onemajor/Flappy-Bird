@@ -9,6 +9,11 @@ const BIRD_CLEARANCE = PIPE.CLEARANCE;
 const MOVE_RANGE = PIPE.MOVE_RANGE;
 const HITBOX_SHRINK = PIPE.HITBOX_SHRINK;
 
+/* 水管图片尺寸：52×320，顶部24px为管帽，其余为管身 */
+const PIPE_IMG_H = 320;
+const PIPE_CAP_H = 24;     /* 管帽在源图中的高度（固定不拉伸） */
+const PIPE_BODY_H = PIPE_IMG_H - PIPE_CAP_H;  /* 管身高度（可拉伸） */
+
 /* 预加载水管图片：绿色固定管、红色移动管 */
 const PIPE_GREEN_IMG = (() => { const img = wx.createImage(); img.src = 'images/pipe-green.png'; return img; })();
 const PIPE_RED_IMG = (() => { const img = wx.createImage(); img.src = 'images/pipe-red.png'; return img; })();
@@ -128,21 +133,35 @@ export default class Pipe extends Sprite {
     const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
 
     if (this.hasTop) {
-      /* 上管：翻转绘制 */
+      /* 上管：翻转绘制，管帽固定大小不拉伸 */
       const topH = this.gapY;
       ctx.save();
       ctx.translate(this.x + this.width / 2, this.gapY);
       ctx.scale(1, -1);
-      ctx.drawImage(this.pipeImg, -this.width / 2, 0, this.width, topH);
+      /* 管帽（固定大小）：源图顶部24px，位于翻转后底部（靠近间隙入口） */
+      const capDestH = Math.min(PIPE_CAP_H, topH);
+      ctx.drawImage(this.pipeImg, 0, 0, this.width, PIPE_CAP_H, -this.width / 2, 0, this.width, capDestH);
+      /* 管身（拉伸）：源图24px以下部分，填充剩余高度 */
+      const bodyDestH = topH - capDestH;
+      if (bodyDestH > 0) {
+        ctx.drawImage(this.pipeImg, 0, PIPE_CAP_H, this.width, PIPE_BODY_H, -this.width / 2, capDestH, this.width, bodyDestH);
+      }
       ctx.restore();
     }
 
     if (this.hasBottom) {
-      /* 下管：正常绘制 */
+      /* 下管：正常绘制，管帽固定大小不拉伸 */
       const bottomY = this.gapY + (this.hasTop ? this.gap : 0);
       const bottomH = availableH - bottomY;
       if (bottomH > 0) {
-        ctx.drawImage(this.pipeImg, this.x, bottomY, this.width, bottomH);
+        /* 管帽（固定大小）：源图顶部24px，位于管道入口处（顶部） */
+        const capDestH = Math.min(PIPE_CAP_H, bottomH);
+        ctx.drawImage(this.pipeImg, 0, 0, this.width, PIPE_CAP_H, this.x, bottomY, this.width, capDestH);
+        /* 管身（拉伸）：源图24px以下部分，填充剩余高度 */
+        const bodyDestH = bottomH - capDestH;
+        if (bodyDestH > 0) {
+          ctx.drawImage(this.pipeImg, 0, PIPE_CAP_H, this.width, PIPE_BODY_H, this.x, bottomY + capDestH, this.width, bodyDestH);
+        }
       }
     }
 

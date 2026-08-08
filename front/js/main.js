@@ -44,7 +44,6 @@ const PROP_COOLDOWN_MIN = 120;  /* 道具最小间隔帧数（2秒），防止�
 
 const PIPE_WIDTH = PIPE.WIDTH;
 const MIN_SPACING = PIPE.MIN_SPACING;
-const MOVE_RANGE = PIPE.MOVE_RANGE;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
 const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
@@ -419,19 +418,7 @@ export default class Main {
 
   _updatePipes() {
     for (let i = this.databus.pipes.length - 1; i >= 0; i--) {
-      const pipe = this.databus.pipes[i];
-      pipe.x -= pipe.speed;
-
-      if (pipe.pipeType === 3) {
-        pipe.movePhase += 0.03;
-        pipe.gapY = pipe.baseGapY + Math.sin(pipe.movePhase) * MOVE_RANGE;
-        const availableH = SCREEN_HEIGHT - GROUND.HEIGHT;
-        pipe.gapY = Math.max(PIPE.MIN_LENGTH, Math.min(pipe.gapY, availableH - pipe.gap - PIPE.MIN_LENGTH));
-      }
-
-      if (pipe.x + pipe.width < -20) {
-        this.databus.removePipe(pipe);
-      }
+      this.databus.pipes[i].update();
     }
   }
 
@@ -478,14 +465,8 @@ export default class Main {
     for (let i = this.databus.pipes.length - 1; i >= 0; i--) {
       const pipe = this.databus.pipes[i];
       if (pipe.isCollideWithBird(this.player)) {
-        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
-        if (this.databus.shieldActive) {
-          this.databus.removePipe(pipe);
-          this.databus.shieldActive = false;
-          this.databus.shieldTimer = 0;
-          GameGlobal.sound.playShieldBreak();
-          continue;
-        }
+        if (this.databus.invincibleTimer > 0) continue;
+        if (this._tryConsumeShield(pipe)) continue;
         this._onPlayerHit();
         return;
       }
@@ -495,14 +476,8 @@ export default class Main {
     for (let i = this.databus.saws.length - 1; i >= 0; i--) {
       const saw = this.databus.saws[i];
       if (saw.isCollideWithBird(this.player)) {
-        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
-        if (this.databus.shieldActive) {
-          this.databus.removeSaw(saw);
-          this.databus.shieldActive = false;
-          this.databus.shieldTimer = 0;
-          GameGlobal.sound.playShieldBreak();
-          continue;
-        }
+        if (this.databus.invincibleTimer > 0) continue;
+        if (this._tryConsumeShield(saw)) continue;
         this._onPlayerHit();
         return;
       }
@@ -512,14 +487,8 @@ export default class Main {
     for (let i = this.databus.rockets.length - 1; i >= 0; i--) {
       const rocket = this.databus.rockets[i];
       if (rocket.isCollideWithBird(this.player)) {
-        if (this.databus.invincibleTimer > 0) continue;  /* 无敌中，忽略 */
-        if (this.databus.shieldActive) {
-          this.databus.removeRocket(rocket);
-          this.databus.shieldActive = false;
-          this.databus.shieldTimer = 0;
-          GameGlobal.sound.playShieldBreak();
-          continue;
-        }
+        if (this.databus.invincibleTimer > 0) continue;
+        if (this._tryConsumeShield(rocket)) continue;
         this._onPlayerHit();
         return;
       }
@@ -542,6 +511,23 @@ export default class Main {
         }
       }
     }
+  }
+
+  /** 护盾抵挡碰撞：消耗护盾并移除障碍物，返回 true 表示护盾生效 */
+  _tryConsumeShield(entity) {
+    if (!this.databus.shieldActive) return false;
+
+    if (this.databus.pipes.includes(entity)) {
+      this.databus.removePipe(entity);
+    } else if (this.databus.saws.includes(entity)) {
+      this.databus.removeSaw(entity);
+    } else if (this.databus.rockets.includes(entity)) {
+      this.databus.removeRocket(entity);
+    }
+    this.databus.shieldActive = false;
+    this.databus.shieldTimer = 0;
+    GameGlobal.sound.playShieldBreak();
+    return true;
   }
 
   _isPropCollideWithPlayer(prop) {
@@ -629,40 +615,33 @@ export default class Main {
     } else if (this.screenState === SCREEN_STATE.LEADERBOARD) {
       this.gameInfo.renderLeaderboard(ctx);
     } else if (this.screenState === SCREEN_STATE.READY) {
-      this.databus.pipes.forEach((p) => p.render(ctx));
-      this.databus.props.forEach((p) => p.render(ctx));
-      this.databus.saws.forEach((s) => s.render(ctx));
-      this.databus.rockets.forEach((r) => r.render(ctx));
-      this.player.render(ctx);
+      this._renderGameEntities(ctx);
       this.gameInfo.renderReady(ctx);
     } else if (this.screenState === SCREEN_STATE.PAUSED) {
-      this.databus.pipes.forEach((p) => p.render(ctx));
-      this.databus.props.forEach((p) => p.render(ctx));
-      this.databus.saws.forEach((s) => s.render(ctx));
-      this.databus.rockets.forEach((r) => r.render(ctx));
-      this.player.render(ctx);
+      this._renderGameEntities(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
       this.gameInfo.renderPauseOverlay(ctx);
     } else if (this.screenState === SCREEN_STATE.COUNTDOWN) {
-      this.databus.pipes.forEach((p) => p.render(ctx));
-      this.databus.props.forEach((p) => p.render(ctx));
-      this.databus.saws.forEach((s) => s.render(ctx));
-      this.databus.rockets.forEach((r) => r.render(ctx));
-      this.player.render(ctx);
+      this._renderGameEntities(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
       this.gameInfo.renderCountdown(ctx);
     } else if (this.screenState === SCREEN_STATE.SETTINGS) {
       this.gameInfo.renderSettings(ctx);
     } else {
-      this.databus.pipes.forEach((p) => p.render(ctx));
-      this.databus.props.forEach((p) => p.render(ctx));
-      this.databus.saws.forEach((s) => s.render(ctx));
-      this.databus.rockets.forEach((r) => r.render(ctx));
-      this.player.render(ctx);
+      this._renderGameEntities(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
     }
 
     ctx.restore();
+  }
+
+  /** 渲染所有游戏实体：水管、道具、锯片、火箭、玩家 */
+  _renderGameEntities(ctx) {
+    this.databus.pipes.forEach((p) => p.render(ctx));
+    this.databus.props.forEach((p) => p.render(ctx));
+    this.databus.saws.forEach((s) => s.render(ctx));
+    this.databus.rockets.forEach((r) => r.render(ctx));
+    this.player.render(ctx);
   }
 
   /* 主循环 */

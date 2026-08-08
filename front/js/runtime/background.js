@@ -39,6 +39,9 @@ export default class BackGround {
 
     /* 预创建天空渐变（全屏尺寸不变，可缓存） */
     this._skyGradient = null;
+
+    /* 缓存游戏地面在屏幕坐标系中的位置（仅与常量相关，只需计算一次） */
+    this._gameGroundY = (SCREEN_HEIGHT - GROUND.HEIGHT) * GAME_SCALE + GAME_OFFSET_Y;
   }
 
   update() {
@@ -64,8 +67,8 @@ export default class BackGround {
     const screenW = SCREEN_W_REAL;
     const screenH = SCREEN_H_REAL;
 
-    /* 计算游戏地面在屏幕上的位置 */
-    const gameGroundY = (SCREEN_HEIGHT - GROUND.HEIGHT) * GAME_SCALE + GAME_OFFSET_Y;
+    /* 使用缓存的游戏地面位置 */
+    const gameGroundY = this._gameGroundY;
 
     /* 计算地面位置 */
     const groundH = GROUND.HEIGHT * GAME_SCALE;
