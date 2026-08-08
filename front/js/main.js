@@ -172,6 +172,7 @@ export default class Main {
     this._deathFlashTimer = 0;
     this._lastMilestone = 0;
     this.gameInfo._milestoneEffectTimer = 0;
+    this.gameInfo._scoreGlowCache = null;  /* 清理辉光缓存，避免分数变化后残留旧缓存 */
     GameGlobal.isGameOverServer = false;
     this.screenState = SCREEN_STATE.READY;
     GameGlobal.screenState = SCREEN_STATE.READY;

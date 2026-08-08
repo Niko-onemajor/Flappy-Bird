@@ -67,6 +67,7 @@ export default class GameInfo extends Emitter {
     this._showQuitConfirm = false;   /* 结束游戏二次确认弹窗 */
     this._draggingSlider = null;     /* 当前正在拖拽的滑动条 */
     this._milestoneEffectTimer = 0;  /* 分数里程碑特效计时器（帧数） */
+    this._scoreGlowCache = null;     /* 金色辉光离屏 Canvas 缓存 */
 
     /* 暂停按钮（左上角，正方形36×36） */
     this.pauseBtnArea = {
@@ -485,9 +486,10 @@ export default class GameInfo extends Emitter {
   }
 
   /* 用数字图片绘制分数（支持里程碑视觉特效）
-   * effectTimer > 0 时触发特效：金色辉光面板 + 逐字径向光晕 + 弹性放大 + Y轴弹跳
+   * effectTimer > 0 时触发特效：金色辉光 + 弹性放大 + Y轴弹跳
    * effectTimer > 100 时视为持久模式（游戏结束卡片），使用呼吸动画替代单次衰减
-   * 性能说明：使用径向渐变替代 ctx.shadowBlur，避免高斯模糊滤波带来的移动端掉帧 */
+   * 性能说明：使用离屏 Canvas 预渲染 shadowBlur 辉光一次，后续仅 drawImage + globalAlpha，
+   * 既保留第一版 shadowBlur 的视觉效果，又避免每帧高斯模糊滤波的性能开销 */
   _drawScore(ctx, score, cx, cy, gap = 4, effectTimer = 0) {
     const digits = String(score).split('');
     const numW = 24;
@@ -499,67 +501,93 @@ export default class GameInfo extends Emitter {
     const hasEffect = effectTimer > 0;
     let scale = 1;
     let extraY = 0;
-    let glowAlpha = 0;
+    let progress = 0;
 
     if (hasEffect) {
       const isPersistent = effectTimer > 100;
-      const progress = isPersistent
+      progress = isPersistent
         ? 0.5 + 0.5 * Math.sin(GameGlobal.databus.frame * 0.08)  /* 持久呼吸效果 */
         : effectTimer / 25;                                        /* 1.0 → 0.0 衰减 */
       scale = 1 + 0.35 * progress;         /* 1.35 → 1.0 放大 */
       extraY = isPersistent ? 0 : Math.sin(effectTimer * 0.6) * 2.5;  /* 仅衰减模式弹跳 */
-      glowAlpha = 0.6 * progress;          /* 辉光强度 */
     }
 
-    /* 1. 金色辉光背景面板（整体辉光氛围） */
-    if (hasEffect && glowAlpha > 0.01) {
-      ctx.save();
-      const padX = 14;
-      const padY = 12;
-      /* 外层柔光 */
-      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.08})`;
-      this._roundRect(ctx, startX - padX - 4, cy - numH / 2 - padY - 4, totalW + padX * 2 + 8, numH + padY * 2 + 8, 14);
-      ctx.fill();
-      /* 内层辉光 */
-      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.12})`;
-      this._roundRect(ctx, startX - padX, cy - numH / 2 - padY, totalW + padX * 2, numH + padY * 2, 10);
-      ctx.fill();
-      /* 金色边框 */
-      ctx.strokeStyle = `rgba(255, 215, 0, ${glowAlpha * 0.3})`;
-      ctx.lineWidth = 1.5;
-      this._roundRect(ctx, startX - padX, cy - numH / 2 - padY, totalW + padX * 2, numH + padY * 2, 10);
-      ctx.stroke();
-      ctx.restore();
-    }
+    if (hasEffect && progress > 0.01) {
+      /* 离屏 Canvas 缓存：用 shadowBlur 渲染一次金色辉光，避免每帧 Gaussian Blur 开销 */
+      const cacheKey = `score_${score}`;
+      if (!this._scoreGlowCache || this._scoreGlowCache.key !== cacheKey) {
+        this._buildScoreGlowCache(digits, numW, numH, step, totalW, cacheKey);
+      }
 
-    for (let i = 0; i < digits.length; i++) {
-      const d = +digits[i];
-      if (!this.numImgs[d]) continue;
-
-      const digitCx = startX + i * step + numW / 2;
-
-      if (hasEffect) {
+      const cache = this._scoreGlowCache;
+      if (cache && cache.canvas) {
         ctx.save();
-
-        /* 2. 每位数独享径向光晕（模拟 shadowBlur 的逐字发光效果，性能开销低得多） */
-        if (glowAlpha > 0.01) {
-          const grad = ctx.createRadialGradient(digitCx, cy, 0, digitCx, cy, numW * 0.85);
-          grad.addColorStop(0, `rgba(255, 215, 0, ${glowAlpha * 0.4})`);
-          grad.addColorStop(0.5, `rgba(255, 200, 0, ${glowAlpha * 0.15})`);
-          grad.addColorStop(1, `rgba(255, 200, 0, 0)`);
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(digitCx, cy, numW * 0.85, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.translate(digitCx, cy + extraY);
+        ctx.translate(cx, cy + extraY);
         ctx.scale(scale, scale);
-        ctx.drawImage(this.numImgs[d], -numW / 2, -numH / 2, numW, numH);
+        /* 呼吸/衰减效果通过 globalAlpha 控制，无需重新渲染 shadowBlur */
+        const isPersistent = effectTimer > 100;
+        const canvasAlpha = isPersistent ? (0.3 + 0.7 * progress) : progress;
+        ctx.globalAlpha = Math.max(0, Math.min(1, canvasAlpha));
+        ctx.drawImage(cache.canvas, -cache.canvas.width / 2, -cache.canvas.height / 2);
         ctx.restore();
       } else {
+        /* 缓存构建失败降级：普通绘制 */
+        for (let i = 0; i < digits.length; i++) {
+          const d = +digits[i];
+          if (!this.numImgs[d]) continue;
+          ctx.drawImage(this.numImgs[d], startX + i * step, cy - numH / 2, numW, numH);
+        }
+      }
+    } else {
+      /* 无特效，普通逐字绘制 */
+      for (let i = 0; i < digits.length; i++) {
+        const d = +digits[i];
+        if (!this.numImgs[d]) continue;
         ctx.drawImage(this.numImgs[d], startX + i * step, cy - numH / 2, numW, numH);
       }
+    }
+  }
+
+  /** 离屏 Canvas 预渲染金色辉光分数（仅一次 shadowBlur 渲染，后续复用缓存）
+   *  视觉还原第一版 shadowBlur 效果，但性能开销仅为一次离屏渲染 + 每帧 drawImage */
+  _buildScoreGlowCache(digits, numW, numH, step, totalW, cacheKey) {
+    try {
+      const padX = 24;
+      const padY = 20;
+      const cw = Math.ceil(totalW + padX * 2);
+      const ch = Math.ceil(numH + padY * 2);
+      const offscreen = wx.createCanvas();
+      offscreen.width = cw;
+      offscreen.height = ch;
+      const octx = offscreen.getContext('2d');
+
+      /* 金色辉光背景 */
+      octx.shadowColor = '#FFD700';
+      octx.shadowBlur = 30;
+      octx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+      this._roundRect(octx, padX - 8, padY - 8, totalW + 16, numH + 16, 16);
+      octx.fill();
+
+      /* 金色边框 */
+      octx.shadowBlur = 20;
+      octx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+      octx.lineWidth = 1.5;
+      this._roundRect(octx, padX - 8, padY - 8, totalW + 16, numH + 16, 16);
+      octx.stroke();
+
+      /* 绘制每个数字，带 shadowBlur 辉光 */
+      for (let i = 0; i < digits.length; i++) {
+        const d = +digits[i];
+        if (!this.numImgs[d]) continue;
+        octx.shadowColor = '#FFD700';
+        octx.shadowBlur = 22;
+        octx.drawImage(this.numImgs[d], padX + i * step, padY, numW, numH);
+      }
+
+      this._scoreGlowCache = { key: cacheKey, canvas: offscreen };
+    } catch (e) {
+      console.warn('[GameInfo] 辉光缓存构建失败:', e);
+      this._scoreGlowCache = { key: cacheKey, canvas: null };
     }
   }
 
