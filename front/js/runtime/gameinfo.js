@@ -52,11 +52,15 @@ export default class GameInfo extends Emitter {
 
     /* 排行榜数据 */
     this._leaderboardData = null;
+    this._leaderboardFormattedDates = [];  /* 缓存格式化后的日期字符串，避免每帧创建Date对象 */
     this._leaderboardLoading = false;  /* 排行榜是否正在加载 */
     this._leaderboardScrollY = 0;    /* 排行榜滚动偏移 */
     this._leaderboardMaxScroll = 0;  /* 排行榜最大滚动量 */
     this._touchStartY = null;        /* 触摸起始Y坐标 */
     this._scrollStartY = 0;          /* 触摸起始时的滚动位置 */
+    this._scrollVelocity = 0;        /* 惯性滚动速度 */
+    this._isTouching = false;        /* 是否正在触摸 */
+    this._lastTouchMoveTime = 0;     /* 上次触摸移动时间 */
     this._countdownValue = 0;        /* 倒计时秒数 */
     this._bestScoreSaved = false;    /* 最佳成绩是否已保存 */
     this._cachedBestScore = null;     /* 最佳成绩缓存，避免每帧读存储 */
@@ -283,6 +287,15 @@ export default class GameInfo extends Emitter {
     const listTop = tableTop + headerH;
     const listBottom = SCREEN_HEIGHT - 20;
 
+    /* 惯性滚动更新 */
+    if (!this._isTouching && Math.abs(this._scrollVelocity) > 0.5) {
+      this._leaderboardScrollY += this._scrollVelocity;
+      this._scrollVelocity *= 0.92;  /* 摩擦力衰减 */
+    } else if (!this._isTouching) {
+      this._scrollVelocity = 0;
+    }
+    this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
+
     /* 半透明背景 */
     ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -385,8 +398,7 @@ export default class GameInfo extends Emitter {
       /* 时间 */
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '11px Arial';
-      const d = new Date(row.createdAt);
-      const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const timeStr = this._leaderboardFormattedDates[i] || '';
       ctx.fillText(timeStr, 300, y + 12);
     }
 
@@ -467,17 +479,18 @@ export default class GameInfo extends Emitter {
   }
 
   /* 用数字图片绘制分数 */
-  _drawScore(ctx, score, cx, cy) {
+  _drawScore(ctx, score, cx, cy, gap = 4) {
     const digits = String(score).split('');
     const numW = 24;
     const numH = 36;
-    const totalW = digits.length * numW;
+    const step = numW + gap;
+    const totalW = digits.length * step - gap;
     const startX = cx - totalW / 2;
 
     for (let i = 0; i < digits.length; i++) {
       const d = parseInt(digits[i]);
       if (this.numImgs[d]) {
-        ctx.drawImage(this.numImgs[d], startX + i * numW, cy - numH / 2, numW, numH);
+        ctx.drawImage(this.numImgs[d], startX + i * step, cy - numH / 2, numW, numH);
       }
     }
   }
@@ -524,82 +537,118 @@ export default class GameInfo extends Emitter {
   /* 游戏结束 */
   renderGameOver(ctx) {
     /* 半透明遮罩 */
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     const score = GameGlobal.databus.score;
+    const best = this._getBestScore();
+    const isNewRecord = score >= best && score > 0;
 
     /* gameover 图片 */
     const goW = 192;
     const goH = 42;
-    ctx.drawImage(this.gameoverImg, SCREEN_WIDTH / 2 - goW / 2, SCREEN_HEIGHT / 2 - 90, goW, goH);
+    const goY = SCREEN_HEIGHT / 2 - 120;
+    ctx.drawImage(this.gameoverImg, SCREEN_WIDTH / 2 - goW / 2, goY, goW, goH);
 
-    /* 最高分 */
-    const best = this._getBestScore();
-    const isNewRecord = score >= best && score > 0;
+    /* ===== 分数卡片面板 ===== */
+    const cardW = 180;
+    const cardH = 90;
+    const cardX = SCREEN_WIDTH / 2 - cardW / 2;
+    const cardY = goY + goH + 15;
 
-    /* 新纪录：分数周围绘制金色闪烁光晕 */
-    if (isNewRecord) {
-      const pulse = 0.4 + 0.4 * Math.sin(GameGlobal.databus.frame * 0.1);
-      const digits = String(score).length;
-      const glowW = Math.max(digits * 24 + 30, 100);
-      const glowH = 50;
-      const gx = SCREEN_WIDTH / 2 - glowW / 2;
-      const gy = SCREEN_HEIGHT / 2 - 30 - glowH / 2;
+    /* 面板背景 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    this._roundRect(ctx, cardX, cardY, cardW, cardH, 12);
+    ctx.fill();
+    ctx.stroke();
 
-      ctx.save();
-      ctx.shadowColor = '#FFD700';
-      ctx.shadowBlur = 20 * (1 + Math.sin(GameGlobal.databus.frame * 0.08));
-      ctx.fillStyle = `rgba(255, 215, 0, ${pulse * 0.2})`;
-      this._roundRect(ctx, gx, gy, glowW, glowH, 8);
-      ctx.fill();
-      ctx.restore();
+    /* 分数标签 */
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('得分', SCREEN_WIDTH / 2, cardY + 16);
 
-      /* 外发光边框 */
-      ctx.save();
-      ctx.shadowColor = '#FFD700';
-      ctx.shadowBlur = 15;
-      ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
-      ctx.lineWidth = 2;
-      this._roundRect(ctx, gx, gy, glowW, glowH, 8);
-      ctx.stroke();
-      ctx.restore();
-    }
+    /* 分数（居中于卡片内） */
+    this._drawScore(ctx, score, SCREEN_WIDTH / 2, cardY + 46);
 
-    /* 分数 */
-    this._drawScore(ctx, score, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30);
-
-    /* 最高分 */
+    /* 新纪录或最高分 */
     if (isNewRecord) {
       if (!this._bestScoreSaved) {
         this._saveBestScore(score);
         this._bestScoreSaved = true;
       }
+      /* 新纪录装饰文字 */
       ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 14px Arial';
+      ctx.font = 'bold 13px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('新纪录!', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
+      ctx.fillText('🏆 新纪录', SCREEN_WIDTH / 2, cardY + 78);
     } else if (best > 0) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '14px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = '12px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 5);
+      ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, cardY + 78);
     }
 
+    /* 新纪录：金色闪烁光晕（围绕卡片内的分数区域） */
+    if (isNewRecord) {
+      const pulse = 0.4 + 0.4 * Math.sin(GameGlobal.databus.frame * 0.1);
+      const dGlowW = cardW - 20;
+      const dGlowH = 40;
+      const dGx = cardX + 10;
+      const dGy = cardY + 28;
+
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 20 * (1 + Math.sin(GameGlobal.databus.frame * 0.08));
+      ctx.fillStyle = `rgba(255, 215, 0, ${pulse * 0.15})`;
+      this._roundRect(ctx, dGx, dGy, dGlowW, dGlowH, 6);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = `rgba(255, 215, 0, ${pulse * 0.6})`;
+      ctx.lineWidth = 1.5;
+      this._roundRect(ctx, dGx, dGy, dGlowW, dGlowH, 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* ===== 按钮区域 ===== */
+    const btnY = cardY + cardH + 20;
+
     /* 重新开始按钮 */
-    ctx.fillStyle = '#4CAF50';
-    ctx.fillRect(this.btnArea.startX, this.btnArea.startY, 160, 40);
+    this._drawButton(ctx, this.btnArea, btnY, '重新开始', '#4CAF50', '#2E7D32');
+
+    /* 返回主页按钮 */
+    this._drawButton(ctx, this.menuBtnArea, btnY + 50, '返回主页', '#2196F3', '#0D47A1');
+  }
+
+  /* 统一按钮渲染 */
+  _drawButton(ctx, area, startY, text, fillColor, strokeColor) {
+    const w = 160;
+    const h = 40;
+    area.startX = SCREEN_WIDTH / 2 - w / 2;
+    area.startY = startY;
+    area.endX = area.startX + w;
+    area.endY = startY + h;
+
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 3;
+    this._roundRect(ctx, area.startX, startY, w, h, 10);
+    ctx.fill();
+    ctx.stroke();
+
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('重新开始', SCREEN_WIDTH / 2, (this.btnArea.startY + this.btnArea.endY) / 2);
-
-    /* 返回主页按钮 */
-    ctx.fillStyle = '#2196F3';
-    ctx.fillRect(this.menuBtnArea.startX, this.menuBtnArea.startY, 160, 40);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('返回主页', SCREEN_WIDTH / 2, (this.menuBtnArea.startY + this.menuBtnArea.endY) / 2);
+    ctx.fillText(text, SCREEN_WIDTH / 2, startY + h / 2);
   }
 
   /* ========== 暂停按钮 ========== */
@@ -1178,11 +1227,19 @@ export default class GameInfo extends Emitter {
     if (this._touchStartY == null) return;
 
     const { clientY } = event.touches[0];
-    /* 滚动位移和屏幕物理像素成正比，保持滚动手感一致 */
     const game = toGameCoord(0, clientY);
     const delta = this._touchStartY - game.y;
     this._leaderboardScrollY = this._scrollStartY + delta;
     this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
+
+    /* 记录速度用于惯性滚动 */
+    const now = Date.now();
+    const dt = now - this._lastTouchMoveTime;
+    if (dt > 0 && dt < 100) {
+      this._scrollVelocity = -delta * 0.3;  /* 速度因子 */
+    }
+    this._lastTouchMoveTime = now;
+    this._isTouching = true;
 
     if (GameGlobal.DEBUG_LOG && GameGlobal.DEBUG_COLLISION) {
       console.log('[Leaderboard] touchMove clientY=', clientY, 'delta=', delta.toFixed(1), 'scrollY=', this._leaderboardScrollY.toFixed(1));
@@ -1193,6 +1250,7 @@ export default class GameInfo extends Emitter {
   touchEndHandler() {
     this._touchStartY = null;
     this._draggingSlider = null;
+    this._isTouching = false;
   }
 
   /* ========== 辅助方法 ========== */
@@ -1229,5 +1287,13 @@ export default class GameInfo extends Emitter {
     } catch (e) {
       /* 忽略 */
     }
+  }
+
+  /** 缓存排行榜日期格式化字符串，避免每帧创建Date对象 */
+  _cacheLeaderboardFormattedDates(data) {
+    this._leaderboardFormattedDates = (data || []).map((row) => {
+      const d = new Date(row.createdAt);
+      return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    });
   }
 }

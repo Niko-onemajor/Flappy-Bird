@@ -42,6 +42,10 @@ export default class BackGround {
 
     /* 缓存游戏地面在屏幕坐标系中的位置（仅与常量相关，只需计算一次） */
     this._gameGroundY = (SCREEN_HEIGHT - GROUND.HEIGHT) * GAME_SCALE + GAME_OFFSET_Y;
+
+    /* 预计算全屏渲染用常量（避免每帧重复计算） */
+    this._groundH = GROUND.HEIGHT * GAME_SCALE;
+    this._groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
   }
 
   update() {
@@ -67,11 +71,10 @@ export default class BackGround {
     const screenW = SCREEN_W_REAL;
     const screenH = SCREEN_H_REAL;
 
-    /* 使用缓存的游戏地面位置 */
+    /* 使用缓存的常量值 */
     const gameGroundY = this._gameGroundY;
-
-    /* 计算地面位置 */
-    const groundH = GROUND.HEIGHT * GAME_SCALE;
+    const groundH = this._groundH;
+    const groundTileW = this._groundTileW;
     const groundY = Math.min(gameGroundY, screenH - groundH);
 
     /* 1. 地面以下区域先用泥土色填充（防止浮点精度缝隙透出蓝色） */
@@ -102,7 +105,6 @@ export default class BackGround {
     }
 
     /* 4. 地面平铺 - 覆盖泥土色区域 */
-    const groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
     const groundTilesNeeded = Math.ceil(screenW / groundTileW) + 2;
     for (let i = 0; i < groundTilesNeeded; i++) {
       ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);

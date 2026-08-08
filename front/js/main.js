@@ -45,6 +45,8 @@ const PROP_COOLDOWN_MIN = 120;  /* 道具最小间隔帧数（2秒），防止�
 const PIPE_WIDTH = PIPE.WIDTH;
 const MIN_SPACING = PIPE.MIN_SPACING;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
+const GRAVITY = PLAYER.GRAVITY;
+const MAX_FALL_SPEED = PLAYER.MAX_FALL_SPEED;
 const SAW_MIN_SCORE = SAW_CFG.MIN_SCORE;
 const SAW_SPAWN_CHANCE = SAW_CFG.SPAWN_CHANCE;
 const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
@@ -53,11 +55,8 @@ const ROCKET_MIN_SCORE = ROCKET_CFG.MIN_SCORE;
 /* 碰撞箱可视化调试开关 */
 GameGlobal.DEBUG_COLLISION = false;
 
-/* 调试日志开关：关闭后过滤实体生成、触摸坐标等详细日志 */
+/* 调试日志开关 */
 GameGlobal.DEBUG_LOG = false;
-
-/* 调试模式：启动后分数直接跳到25，方便测试火箭 */
-GameGlobal.DEBUG_SKIP_SCORE = false;
 
 /**
  * 本地游戏主循环 —— 游戏逻辑在本地运行，彻底消除网络延迟。
@@ -77,7 +76,12 @@ export default class Main {
   _lastPropScore = 0;       /* 上次生成道具时的分数 */
   _pipesSinceLastProp = 0;  /* 距离上次道具生成经过的水管数（每5根保底） */
   _scoreSubmitted = false;
-  _playedDieSound = false;
+  _scoreSubmitting = false;   /* 分数提交中标志，防止重复提交 */
+  _scoreRetryTimer = 0;      /* 分数提交重试计时器 */
+  _scoreRetryCount = 0;      /* 分数提交重试次数 */
+  _deathTimer = -1;          /* 死亡动画计时器（-1=未激活） */
+  _deathFadeAlpha = 0;       /* 死亡画面渐暗透明度 */
+  _deathFlashTimer = 0;      /* 死亡闪白计时器 */
   _prevScore = 0;
   _countdownTimer = 0;
   _countdownStart = 0;
@@ -85,6 +89,7 @@ export default class Main {
   _shakeTimer = 0;          /* 屏幕抖动剩余帧数 */
   _shakeIntensity = 0;      /* 屏幕抖动强度 */
   _staticFrameCount = 0;    /* 静态状态帧计数器，用于降帧 */
+  _lastMilestone = 0;        /* 上次触发的分数里程碑 */
 
   constructor() {
     this.player = new Player();
@@ -132,6 +137,11 @@ export default class Main {
     GameGlobal.screenState = SCREEN_STATE.HOME;
     GameGlobal.isGameOverServer = false;
     this._scoreSubmitted = false;
+    this._scoreSubmitting = false;
+    this._scoreRetryTimer = 0;
+    this._deathTimer = -1;
+    this._deathFadeAlpha = 0;
+    this._deathFlashTimer = 0;
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
@@ -146,7 +156,11 @@ export default class Main {
     this._lastPropScore = 0;
     this._pipesSinceLastProp = 0;
     this._scoreSubmitted = false;
-    this._playedDieSound = false;
+    this._scoreSubmitting = false;
+    this._scoreRetryTimer = 0;
+    this._deathTimer = -1;
+    this._deathFadeAlpha = 0;
+    this._deathFlashTimer = 0;
     this._prevScore = 0;
     GameGlobal.isGameOverServer = false;
     this.screenState = SCREEN_STATE.READY;
@@ -167,11 +181,6 @@ export default class Main {
     if (this.screenState === SCREEN_STATE.READY) {
       this.screenState = SCREEN_STATE.PLAYING;
       GameGlobal.screenState = SCREEN_STATE.PLAYING;
-      /* 调试：跳过前20分，立即测试火箭 */
-      if (GameGlobal.DEBUG_SKIP_SCORE) {
-        this.databus.score = 25;
-        if (GameGlobal.DEBUG_LOG) console.log('[Debug] 分数跳过至25，开始测试火箭');
-      }
       return;
     }
 
@@ -207,6 +216,7 @@ export default class Main {
     try {
       const data = await getTopScores(10);
       this.gameInfo._leaderboardData = data;
+      this.gameInfo._cacheLeaderboardFormattedDates(data);
     } catch (err) {
       console.error('[Main] 获取排行榜失败:', err);
     }
@@ -237,12 +247,41 @@ export default class Main {
   }
 
   async submitScoreToServer() {
-    if (this.databus.score <= 0) return;
+    if (this.databus.score <= 0) { this._scoreSubmitted = true; return; }
+    this._scoreRetryCount = 0;
     try {
       await submitScore('Player', this.databus.score);
+      this._scoreSubmitted = true;
+      console.log('[Main] 分数提交成功');
     } catch (err) {
-      console.error('[Main] 提交分数失败:', err);
+      console.error('[Main] 提交分数失败，3秒后重试:', err);
+      this._scoreRetryTimer = 180;  /* 3秒后重试 */
+      this._scoreRetryCount = 1;
     }
+    this._scoreSubmitting = false;
+  }
+
+  /** 分数提交重试（每帧调用，由 game over 块触发） */
+  _retryScoreSubmission() {
+    if (this._scoreSubmitted) return;
+    if (this._scoreRetryTimer <= 0) return;
+    this._scoreRetryTimer--;
+    if (this._scoreRetryTimer > 0) return;
+    if (this._scoreRetryCount >= 3) {
+      console.error('[Main] 分数提交重试耗尽，放弃');
+      this._scoreSubmitted = true;  /* 停止重试 */
+      return;
+    }
+    this._scoreRetryCount++;
+    submitScore('Player', this.databus.score)
+      .then(() => {
+        this._scoreSubmitted = true;
+        console.log('[Main] 分数提交重试成功');
+      })
+      .catch((err) => {
+        console.error(`[Main] 分数提交重试第${this._scoreRetryCount}次失败:`, err);
+        this._scoreRetryTimer = 180;  /* 再等3秒 */
+      });
   }
 
   /* ========== 本地游戏逻辑 ========== */
@@ -256,6 +295,35 @@ export default class Main {
         this.screenState = SCREEN_STATE.PLAYING;
         GameGlobal.screenState = SCREEN_STATE.PLAYING;
         GameGlobal.sound.resumeBgm();
+      }
+      return;
+    }
+
+    /* ===== 死亡动画阶段：小鸟坠落 + 画面渐暗 ===== */
+    if (this._deathTimer >= 0) {
+      this._deathTimer--;
+      this._deathFadeAlpha = 1 - this._deathTimer / 60;  /* 0→1 */
+      this.player.vy += GRAVITY;
+      this.player.vy = Math.min(this.player.vy, MAX_FALL_SPEED);
+      this.player.y += this.player.vy;
+      this.player.currentRotation += (90 - this.player.currentRotation) * 0.05;
+
+      /* 坠落到地面时停住 */
+      const groundY = SCREEN_HEIGHT - 90 - this.player.height;
+      if (this.player.y >= groundY) {
+        this.player.y = groundY;
+        this.player.vy = 0;
+      }
+
+      if (this._deathTimer <= 0) {
+        this.player.destroy();
+        this.databus.gameOver();
+        GameGlobal.isGameOverServer = true;
+        GameGlobal.sound.stopRocketFly();
+        if (!this._scoreSubmitted) {
+          this._scoreSubmitted = true;
+          this.submitScoreToServer();
+        }
       }
       return;
     }
@@ -278,22 +346,31 @@ export default class Main {
         pipe.scored = true;
         this.databus.score += this.databus.scoreMultiplier;
         GameGlobal.sound.playPoint();
+
+        /* 分数里程碑提示：每10分播放提升音效 */
+        const s = this.databus.score;
+        const milestone = Math.floor(s / 10) * 10;
+        if (milestone >= 10 && milestone > this._lastMilestone) {
+          this._lastMilestone = milestone;
+          GameGlobal.sound.playSwoosh();
+          /* 屏幕抖动作视觉反馈 */
+          if (GameGlobal.settings && GameGlobal.settings.screenShake) {
+            this._shakeTimer = Math.max(this._shakeTimer, 4);
+            this._shakeIntensity = Math.max(this._shakeIntensity, 4);
+          }
+        }
       }
     }
 
-    /* 游戏结束处理 */
+    /* 游戏结束处理（仅提交分数和清理，音效已在碰撞时播放） */
     if (this.databus.isGameOver) {
       GameGlobal.isGameOverServer = true;
       GameGlobal.sound.stopRocketFly();
-      if (!this._playedDieSound) {
-        this._playedDieSound = true;
-        GameGlobal.sound.playHit();
-        GameGlobal.sound.playDie();
-      }
-      if (!this._scoreSubmitted) {
-        this._scoreSubmitted = true;
+      if (!this._scoreSubmitted && !this._scoreSubmitting) {
+        this._scoreSubmitting = true;
         this.submitScoreToServer();
       }
+      this._retryScoreSubmission();  /* 每帧检查重试计时器 */
     }
   }
 
@@ -350,20 +427,12 @@ export default class Main {
   }
 
   _createPropForPipe(pipe) {
-    if (!pipe || pipe.gapY == null || pipe.gap == null) {
-      console.warn('[Prop] 跳过生成：水管对象无效', pipe);
-      return;
-    }
     const prop = this.databus.pool.getItemByClass('prop', Prop);
     prop.init(pipe);  /* 内部基于水管精确计算X和Y */
     this.databus.props.push(prop);
   }
 
   _createSawForPipe(pipe, pipeSpeed) {
-    if (!pipe || pipe.gapY == null || pipe.gap == null) {
-      console.warn('[Saw] 跳过生成：水管对象无效', pipe);
-      return;
-    }
     /* 找到上一个水管（前一对），用于计算两根水管之间的空白区域 */
     const pipes = this.databus.pipes;
     const prevPipe = pipes.length >= 2 ? pipes[pipes.length - 2] : null;
@@ -430,12 +499,14 @@ export default class Main {
       const prop = this.databus.props[i];
       if (prop.collected) continue;
       prop.x -= prop.speed;
+      prop.animPhase += 0.06;  /* PROP.FLOAT_SPEED，保持漂浮动画活跃 */
 
       /* 跟随移动水管同步更新Y坐标 */
       prop.syncYWithMovingPipe();
 
       if (prop.x + prop.width < -10) {
-        this.databus.removeProp(prop);
+        this.databus.props.splice(i, 1);
+        this.databus.pool.recover('prop', prop);
       }
     }
   }
@@ -445,7 +516,8 @@ export default class Main {
       const saw = this.databus.saws[i];
       saw.update();
       if (saw.x + saw.width < -20) {
-        this.databus.removeSaw(saw);
+        this.databus.saws.splice(i, 1);
+        this.databus.pool.recover('saw', saw);
       }
     }
   }
@@ -456,7 +528,9 @@ export default class Main {
       rocket.update();
       if (rocket.x + rocket.width < -30 || rocket.x > SCREEN_WIDTH + 300
           || rocket.y + rocket.height < -30 || rocket.y > SCREEN_HEIGHT + 30) {
-        this.databus.removeRocket(rocket);
+        rocket.cleanup();
+        this.databus.rockets.splice(i, 1);
+        this.databus.pool.recover('rocket', rocket);
       }
     }
   }
@@ -581,10 +655,11 @@ export default class Main {
     this._applyHitFeedback();
 
     if (this.databus.lives <= 0) {
-      this.player.destroy();
-      this.databus.gameOver();
+      /* 启动死亡动画（小鸟坠落+画面渐暗），而非立即结束 */
+      this._deathTimer = 60;  /* 1秒动画 */
+      this._deathFadeAlpha = 0;
+      this._deathFlashTimer = 8;  /* 碰撞闪白8帧 */
       GameGlobal.sound.playDie();
-      /* 游戏结束时加强振动反馈 */
       if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
         wx.vibrateShort({ type: 'heavy' });
       }
@@ -640,6 +715,21 @@ export default class Main {
     }
 
     ctx.restore();
+
+    /* 3. 死亡动画效果 */
+    if (this._deathTimer >= 0) {
+      /* 闪白效果（碰撞瞬间） */
+      if (this._deathFlashTimer > 0) {
+        this._deathFlashTimer--;
+        const flashAlpha = this._deathFlashTimer / 8;  /* 1→0 衰减 */
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.5})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      /* 渐暗遮罩 */
+      const alpha = 0.2 + this._deathFadeAlpha * 0.25;  /* 0.2 → 0.45 */
+      ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
   }
 
   /** 渲染所有游戏实体：水管、道具、锯片、火箭、玩家 */
