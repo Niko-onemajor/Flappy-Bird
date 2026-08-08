@@ -3,12 +3,8 @@ import Main from './js/main';
 /* 记录启动开始时间（import 完成后尽快执行） */
 const _startTime = Date.now();
 
-/**
- * 获取微信用户昵称（封装为 Promise，失败时自动重试）
- * @param {number} [retries=3] - 重试次数
- * @param {number} [delay=1000] - 重试间隔(ms)
- * @returns {Promise<string|null>} 昵称或 null
- */
+/* 获取微信用户昵称（封装为 Promise，失败时自动重试）
+ * 保留作为备选方案，优先使用手动输入的名称 */
 function fetchWxNickName(retries = 3, delay = 1000) {
   return new Promise((resolve) => {
     function attempt(n) {
@@ -16,7 +12,10 @@ function fetchWxNickName(retries = 3, delay = 1000) {
         withCredentials: false,
         success: (res) => {
           const name = res.userInfo.nickName;
-          GameGlobal.nickName = name;
+          if (name && !GameGlobal.nickName) {
+            GameGlobal.nickName = name;
+            try { wx.setStorageSync('flappy_nickname', name); } catch (e) {}
+          }
           console.log('[Game] 获取用户昵称成功:', name);
           resolve(name);
         },
@@ -36,6 +35,20 @@ function fetchWxNickName(retries = 3, delay = 1000) {
 
 /* 挂载到 GameGlobal，供其他模块在需要时调用 */
 GameGlobal.fetchWxNickName = fetchWxNickName;
+
+/* 关闭调试模式，确保体验版不会出现红字和 vConsole 悬浮球 */
+if (typeof wx.setEnableDebug === 'function') {
+  wx.setEnableDebug({ enableDebug: false });
+}
+
+/* 加载本地缓存的玩家昵称 */
+try {
+  const saved = wx.getStorageSync('flappy_nickname');
+  if (saved) {
+    GameGlobal.nickName = saved;
+    console.log('[Game] 加载本地昵称:', saved);
+  }
+} catch (e) {}
 
 /* 开启高性能模式：iOS 设备获得更好的渲染性能 */
 if (typeof wx.setPreferredFramesPerSecond === 'function') {

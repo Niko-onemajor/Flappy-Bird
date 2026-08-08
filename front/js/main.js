@@ -153,11 +153,6 @@ export default class Main {
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
-
-    /* 回到主页时尝试获取微信昵称 */
-    if (!GameGlobal.nickName && typeof GameGlobal.fetchWxNickName === 'function') {
-      GameGlobal.fetchWxNickName();
-    }
   }
 
   startGame() {
@@ -172,10 +167,6 @@ export default class Main {
     this._scoreSubmitted = false;
     this._scoreSubmitting = false;
 
-    /* 在用户交互后尝试获取微信昵称（提升成功率） */
-    if (!GameGlobal.nickName && typeof GameGlobal.fetchWxNickName === 'function') {
-      GameGlobal.fetchWxNickName();
-    }
     this._scoreRetryTimer = 0;
     this._deathTimer = -1;
     this._deathFadeAlpha = 0;
@@ -267,10 +258,10 @@ export default class Main {
     this.aniId = requestAnimationFrame(this._boundLoop);
   }
 
-  /** 获取玩家昵称（优先使用已缓存的值，否则重新从微信获取） */
+  /** 获取玩家昵称（优先使用本地缓存的昵称，否则从微信获取） */
   async _ensureNickName() {
     if (GameGlobal.nickName) return GameGlobal.nickName;
-    /* 尝试重新获取微信用户昵称 */
+    /* 尝试获取微信用户昵称（备选方案） */
     if (typeof GameGlobal.fetchWxNickName === 'function') {
       const name = await GameGlobal.fetchWxNickName();
       if (name) return name;
@@ -781,9 +772,9 @@ export default class Main {
       this.tick();
       this.render();
     } else {
-      /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 20fps，减少 CPU/GPU 开销 */
+      /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 30fps，减少 CPU/GPU 开销 */
       this._staticFrameCount++;
-      if (this._staticFrameCount % 3 === 0) {
+      if (this._staticFrameCount % 2 === 0) {
         this.render();
       }
     }

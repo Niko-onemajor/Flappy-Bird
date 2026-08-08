@@ -12,6 +12,7 @@ function toGameCoord(clientX, clientY) {
 
 /* ========== 设置存储键 ========== */
 const SETTINGS_KEY = 'flappy_settings';
+const NICKNAME_KEY = 'flappy_nickname';
 
 /* ========== 设置默认值 ========== */
 const DEFAULT_SETTINGS = {
@@ -41,6 +42,28 @@ export default class GameInfo extends Emitter {
       endX: SCREEN_WIDTH / 2 + 60,
       endY: SCREEN_HEIGHT / 2 + 120,
     };
+
+    /* 玩家昵称按钮（左下角） */
+    this.playerBtnArea = {
+      startX: 10,
+      startY: SCREEN_HEIGHT - 50,
+      endX: 110,
+      endY: SCREEN_HEIGHT - 14,
+    };
+
+    /* 加载本地缓存的玩家昵称 */
+    this._cachedNickName = null;
+    try {
+      const saved = wx.getStorageSync(NICKNAME_KEY);
+      if (saved) {
+        this._cachedNickName = saved;
+        GameGlobal.nickName = saved;
+      }
+    } catch (e) {}
+
+    /* 键盘输入状态 */
+    this._showKeyboard = false;
+    this._keyboardInput = '';
 
     /* 排行榜返回按钮 */
     this.backBtnArea = {
@@ -133,6 +156,12 @@ export default class GameInfo extends Emitter {
     wx.onTouchMove(this._touchMoveHandler);
     this._touchEndHandler = this.touchEndHandler.bind(this);
     wx.onTouchEnd(this._touchEndHandler);
+
+    /* 键盘输入事件监听 */
+    this._onKeyboardConfirm = this._handleKeyboardConfirm.bind(this);
+    wx.onKeyboardConfirm(this._onKeyboardConfirm);
+    this._onKeyboardComplete = this._handleKeyboardComplete.bind(this);
+    wx.onKeyboardComplete(this._onKeyboardComplete);
 
     /* 预加载心形图片 */
     this.heartImg = wx.createImage();
@@ -279,6 +308,9 @@ export default class GameInfo extends Emitter {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('排行榜', SCREEN_WIDTH / 2, (lbBtn.startY + lbBtn.endY) / 2);
+
+    /* 玩家昵称按钮（左下角） */
+    this._renderPlayerBtn(ctx);
   }
 
   /* ========== 排行榜渲染 ========== */
@@ -925,6 +957,58 @@ export default class GameInfo extends Emitter {
     ctx.fillText('⚙', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2 + 1);
   }
 
+  /* ========== 玩家昵称按钮 ========== */
+  _renderPlayerBtn(ctx) {
+    const area = this.playerBtnArea;
+    /* 半透明背景 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    this._roundRect(ctx, area.startX, area.startY, area.endX - area.startX, area.endY - area.startY, 6);
+    ctx.fill();
+
+    /* 玩家图标 + 昵称 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const name = GameGlobal.nickName || '未设置';
+    const label = name.length > 8 ? name.slice(0, 7) + '…' : name;
+    ctx.fillText(`👤 ${label}`, area.startX + 8, (area.startY + area.endY) / 2);
+  }
+
+  /* ========== 键盘输入处理 ========== */
+  _showNicknameInput() {
+    const current = GameGlobal.nickName || '';
+    wx.showKeyboard({
+      defaultValue: current,
+      maxLength: 10,
+      multiple: false,
+      confirmType: 'done',
+    });
+  }
+
+  _handleKeyboardConfirm(res) {
+    if (!res || !res.value) return;
+    const name = res.value.trim();
+    if (name.length < 3 || name.length > 10) {
+      wx.showToast({ title: '昵称需3-10个字符', icon: 'none' });
+      return;
+    }
+    GameGlobal.nickName = name;
+    this._cachedNickName = name;
+    try {
+      wx.setStorageSync(NICKNAME_KEY, name);
+    } catch (e) {}
+    console.log('[GameInfo] 设置昵称:', name);
+    /* 设置成功后自动开始游戏（如果当前在主页） */
+    if (GameGlobal.screenState === 'home') {
+      this.emit('start');
+    }
+  }
+
+  _handleKeyboardComplete() {
+    /* 键盘关闭时无需额外处理 */
+  }
+
   /* ========== 设置面板渲染 ========== */
   renderSettings(ctx) {
     /* 半透明背景 */
@@ -1092,6 +1176,11 @@ export default class GameInfo extends Emitter {
         this.emit('showSettings');
         return;
       }
+      /* 玩家昵称按钮 */
+      if (this._isInArea(game, this.playerBtnArea)) {
+        this._showNicknameInput();
+        return;
+      }
       if (GameGlobal.DEBUG_LOG) console.log('[Touch] 主页触摸:', game.x, game.y,
         '开始按钮:', this.homeBtnArea.startX, this.homeBtnArea.startY,
         '排行按钮:', this.leaderboardBtnArea.startX, this.leaderboardBtnArea.startY);
@@ -1102,6 +1191,11 @@ export default class GameInfo extends Emitter {
         game.y <= this.homeBtnArea.endY
       ) {
         if (GameGlobal.DEBUG_LOG) console.log('[Touch] → 点击开始游戏');
+        /* 未设置昵称时先弹出输入 */
+        if (!GameGlobal.nickName) {
+          this._showNicknameInput();
+          return;
+        }
         this.emit('start');
         return;
       }
