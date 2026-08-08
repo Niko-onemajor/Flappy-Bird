@@ -549,7 +549,8 @@ export default class GameInfo extends Emitter {
   }
 
   /** 离屏 Canvas 预渲染金色辉光分数（仅一次 shadowBlur 渲染，后续复用缓存）
-   *  视觉还原第一版 shadowBlur 效果，但性能开销仅为一次离屏渲染 + 每帧 drawImage */
+   *  仅对数字本身施加 shadowBlur，还原第一版无方框的边缘发光效果，
+   *  性能开销仅为一次离屏渲染 + 每帧 drawImage */
   _buildScoreGlowCache(digits, numW, numH, step, totalW, cacheKey) {
     try {
       const padX = 24;
@@ -560,27 +561,14 @@ export default class GameInfo extends Emitter {
       offscreen.width = cw;
       offscreen.height = ch;
       const octx = offscreen.getContext('2d');
+      octx.globalCompositeOperation = 'source-over';
 
-      /* 金色辉光背景 */
-      octx.shadowColor = '#FFD700';
-      octx.shadowBlur = 30;
-      octx.fillStyle = 'rgba(255, 215, 0, 0.15)';
-      this._roundRect(octx, padX - 8, padY - 8, totalW + 16, numH + 16, 16);
-      octx.fill();
-
-      /* 金色边框 */
-      octx.shadowBlur = 20;
-      octx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
-      octx.lineWidth = 1.5;
-      this._roundRect(octx, padX - 8, padY - 8, totalW + 16, numH + 16, 16);
-      octx.stroke();
-
-      /* 绘制每个数字，带 shadowBlur 辉光 */
+      /* 仅绘制数字，带 shadowBlur 辉光，无背景方框 */
       for (let i = 0; i < digits.length; i++) {
         const d = +digits[i];
         if (!this.numImgs[d]) continue;
         octx.shadowColor = '#FFD700';
-        octx.shadowBlur = 22;
+        octx.shadowBlur = 24;
         octx.drawImage(this.numImgs[d], padX + i * step, padY, numW, numH);
       }
 
