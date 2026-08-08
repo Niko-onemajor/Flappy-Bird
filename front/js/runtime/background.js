@@ -77,6 +77,10 @@ export default class BackGround {
     const groundTileW = this._groundTileW;
     const groundY = Math.min(gameGroundY, screenH - groundH);
 
+    /* 0. 兜底：先填充整个画布为天空蓝色，确保任何时候都不会黑屏 */
+    ctx.fillStyle = '#4DC9F6';
+    ctx.fillRect(0, 0, screenW, screenH);
+
     /* 1. 地面以下区域先用泥土色填充（防止浮点精度缝隙透出蓝色） */
     if (groundY + groundH < screenH) {
       ctx.fillStyle = '#8B5E3C';

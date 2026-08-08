@@ -778,25 +778,29 @@ export default class Main {
 
   /* 主循环 */
   loop() {
-    /* 60fps 帧率限制：确保高刷屏(120Hz+)上游戏速度一致 */
-    const now = performance.now();
-    const elapsed = now - this._lastFrameTime;
-    if (elapsed >= this._frameInterval) {
-      /* 对齐到帧间隔边界，防止累积漂移 */
-      this._lastFrameTime = now - (elapsed % this._frameInterval);
+    try {
+      /* 60fps 帧率限制：确保高刷屏(120Hz+)上游戏速度一致 */
+      const now = performance.now();
+      const elapsed = now - this._lastFrameTime;
+      if (elapsed >= this._frameInterval) {
+        /* 对齐到帧间隔边界，防止累积漂移 */
+        this._lastFrameTime = now - (elapsed % this._frameInterval);
 
-      this.bg.update();
+        this.bg.update();
 
-      if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
-        this.tick();
-        this.render();
-      } else {
-        /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 30fps，减少 CPU/GPU 开销 */
-        this._staticFrameCount++;
-        if (this._staticFrameCount % 2 === 0) {
+        if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
+          this.tick();
           this.render();
+        } else {
+          /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 30fps，减少 CPU/GPU 开销 */
+          this._staticFrameCount++;
+          if (this._staticFrameCount % 2 === 0) {
+            this.render();
+          }
         }
       }
+    } catch (e) {
+      console.error('[Main] 游戏循环异常:', e, e.stack);
     }
 
     this.aniId = requestAnimationFrame(this._boundLoop);

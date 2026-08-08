@@ -260,17 +260,29 @@ export default class GameInfo extends Emitter {
 
   /* ========== 主页渲染 ========== */
   renderHome(ctx) {
-    /* 标题 "Flappy Bird" 使用message图片 */
-    const msgW = 184;
-    const msgH = 267;
-    const msgScale = 0.7;
-    ctx.drawImage(
-      this.messageImg,
-      SCREEN_WIDTH / 2 - (msgW * msgScale) / 2,
-      SCREEN_HEIGHT / 2 - 140,
-      msgW * msgScale,
-      msgH * msgScale
-    );
+    /* 标题 "Flappy Bird" 使用message图片（仅图片加载完成后绘制） */
+    if (this.messageImg && this.messageImg.width > 0 && this.messageImg.height > 0) {
+      const msgW = 184;
+      const msgH = 267;
+      const msgScale = 0.7;
+      ctx.drawImage(
+        this.messageImg,
+        SCREEN_WIDTH / 2 - (msgW * msgScale) / 2,
+        SCREEN_HEIGHT / 2 - 140,
+        msgW * msgScale,
+        msgH * msgScale
+      );
+    } else {
+      /* 图片未加载时显示文字标题 */
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3;
+      ctx.font = 'bold 36px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('Flappy Bird', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 120);
+      ctx.fillText('Flappy Bird', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 120);
+    }
 
     /* 开始按钮 */
     const btn = this.homeBtnArea;
