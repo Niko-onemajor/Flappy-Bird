@@ -13,7 +13,7 @@ const AUDIO_CONFIG = {
   point: { src: 'audio/point.mp3', volume: AUDIO_VOLUME.point },
   hit: { src: 'audio/hit.mp3', volume: AUDIO_VOLUME.hit },
   die: { src: 'audio/die.mp3', volume: AUDIO_VOLUME.die },
-  swoosh: { src: 'audio/swoosh.mp3', volume: AUDIO_VOLUME.swoosh },
+  swoosh: { src: 'audio/level_up.mp3', volume: AUDIO_VOLUME.swoosh },
   shieldBreak: { src: 'audio/shield_break.mp3', volume: AUDIO_VOLUME.shieldBreak },
   shieldPickup: { src: 'audio/shield_pickup.mp3', volume: AUDIO_VOLUME.shieldPickup },
   scoreX2: { src: 'audio/score_x2.mp3', volume: AUDIO_VOLUME.scoreX2 },
