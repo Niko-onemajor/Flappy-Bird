@@ -113,6 +113,10 @@ export default class Player extends Sprite {
 
       db.lives--;
       GameGlobal.sound.playHit();
+      /* 振动反馈（根据设置） */
+      if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
+        wx.vibrateShort({ type: 'light' });
+      }
       if (GameGlobal.DEBUG_LOG) console.log(`[Player] 撞地面! 剩余生命=${db.lives}`);
       if (db.lives <= 0) {
         this.destroy();

@@ -2,6 +2,7 @@
  * 音效管理器
  * 音量平衡：背景音乐 < 音效反馈，避免互相压盖
  * 延迟创建音频上下文，减少启动卡顿
+ * 支持分通道音量控制：总音量、BGM、音效独立调节
  */
 import { AUDIO_VOLUME } from './config';
 
@@ -20,11 +21,20 @@ const AUDIO_CONFIG = {
   rocketFly: { src: 'audio/rocket_fly.mp3', volume: AUDIO_VOLUME.rocketFly },
 };
 
+/** 判断音频键属于 BGM 还是音效 */
+function _isBgmKey(key) {
+  return key === 'bgm';
+}
+
 export default class Sound {
   constructor() {
     this._cache = {};
     this._fuseBurnPlaying = false;
     this._rocketFlyPlaying = false;
+    /* 音量通道：0.0 ~ 1.0 */
+    this.masterVolume = 1.0;
+    this.bgmVolume = 1.0;
+    this.sfxVolume = 1.0;
   }
 
   /* 延迟创建并缓存音频上下文 */
@@ -34,11 +44,43 @@ export default class Sound {
       if (!cfg) return null;
       const audio = wx.createInnerAudioContext();
       audio.src = cfg.src;
-      audio.volume = cfg.volume;
+      audio.volume = this._calcVolume(key, cfg.volume);
       if (cfg.loop) audio.loop = true;
       this._cache[key] = audio;
     }
     return this._cache[key];
+  }
+
+  /** 计算最终音量 = 基础音量 × 总音量 × 通道音量 */
+  _calcVolume(key, baseVolume) {
+    const channelVolume = _isBgmKey(key) ? this.bgmVolume : this.sfxVolume;
+    return baseVolume * this.masterVolume * channelVolume;
+  }
+
+  /** 更新所有已创建音频的音量 */
+  _updateAllVolumes() {
+    Object.keys(this._cache).forEach((key) => {
+      const audio = this._cache[key];
+      if (!audio) return;
+      const cfg = AUDIO_CONFIG[key];
+      if (cfg) {
+        audio.volume = this._calcVolume(key, cfg.volume);
+      }
+    });
+  }
+
+  /**
+   * 设置音量通道
+   * @param {'master'|'bgm'|'sfx'} type - 通道类型
+   * @param {number} value - 音量值 0.0 ~ 1.0
+   */
+  setVolume(type, value) {
+    switch (type) {
+      case 'master': this.masterVolume = value; break;
+      case 'bgm': this.bgmVolume = value; break;
+      case 'sfx': this.sfxVolume = value; break;
+    }
+    this._updateAllVolumes();
   }
 
   playBgm() {
@@ -157,15 +199,5 @@ export default class Sound {
     });
     this._fuseBurnPlaying = false;
     this._rocketFlyPlaying = false;
-  }
-
-  /* 静音/取消静音 */
-  setMuted(muted) {
-    Object.keys(this._cache).forEach((key) => {
-      const a = this._cache[key];
-      if (a) {
-        a.volume = muted ? 0 : (AUDIO_CONFIG[key] ? AUDIO_CONFIG[key].volume : 0.3);
-      }
-    });
   }
 }

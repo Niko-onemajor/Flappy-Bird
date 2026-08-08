@@ -24,6 +24,7 @@ const SCREEN_STATE = {
   PAUSED: 'paused',
   COUNTDOWN: 'countdown',
   LEADERBOARD: 'leaderboard',
+  SETTINGS: 'settings',
 };
 
 /* 难度参数（与后端 GameService.cs 保持一致） */
@@ -84,6 +85,7 @@ export default class Main {
   _prevScore = 0;
   _countdownTimer = 0;
   _countdownStart = 0;
+  _prevScreenState = null;
 
   constructor() {
     this.player = new Player();
@@ -96,6 +98,8 @@ export default class Main {
     this.gameInfo.on('pause', this.pauseGame.bind(this));
     this.gameInfo.on('resume', this.resumeGame.bind(this));
     this.gameInfo.on('quitToHome', this.goToHome.bind(this));
+    this.gameInfo.on('showSettings', this.showSettings.bind(this));
+    this.gameInfo.on('hideSettings', this.hideSettings.bind(this));
 
     this._boundLoop = this.loop.bind(this);
 
@@ -204,6 +208,27 @@ export default class Main {
       this.gameInfo._leaderboardData = data;
     } catch (err) {
       console.error('[Main] 获取排行榜失败:', err);
+    }
+    cancelAnimationFrame(this.aniId);
+    this.aniId = requestAnimationFrame(this._boundLoop);
+  }
+
+  /* ========== 设置面板 ========== */
+  showSettings() {
+    this._prevScreenState = this.screenState;
+    this.screenState = SCREEN_STATE.SETTINGS;
+    GameGlobal.screenState = SCREEN_STATE.SETTINGS;
+    cancelAnimationFrame(this.aniId);
+    this.aniId = requestAnimationFrame(this._boundLoop);
+  }
+
+  hideSettings() {
+    if (this._prevScreenState === SCREEN_STATE.PAUSED) {
+      this.screenState = SCREEN_STATE.PAUSED;
+      GameGlobal.screenState = SCREEN_STATE.PAUSED;
+    } else {
+      this.screenState = SCREEN_STATE.HOME;
+      GameGlobal.screenState = SCREEN_STATE.HOME;
     }
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
@@ -561,8 +586,8 @@ export default class Main {
     if (GameGlobal.DEBUG_LOG) console.log(`[Player] 受伤! 剩余生命=${this.databus.lives}`);
     GameGlobal.sound.playHit();
 
-    /* 振动反馈（轻触） */
-    if (typeof wx.vibrateShort === 'function') {
+    /* 振动反馈（根据设置） */
+    if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
       wx.vibrateShort({ type: 'light' });
     }
 
@@ -616,6 +641,8 @@ export default class Main {
       this.player.render(ctx);
       this.gameInfo.renderLocal(ctx, this.databus);
       this.gameInfo.renderCountdown(ctx);
+    } else if (this.screenState === SCREEN_STATE.SETTINGS) {
+      this.gameInfo.renderSettings(ctx);
     } else {
       this.databus.pipes.forEach((p) => p.render(ctx));
       this.databus.props.forEach((p) => p.render(ctx));

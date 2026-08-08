@@ -10,6 +10,18 @@ function toGameCoord(clientX, clientY) {
   };
 }
 
+/* ========== 设置存储键 ========== */
+const SETTINGS_KEY = 'flappy_settings';
+
+/* ========== 设置默认值 ========== */
+const DEFAULT_SETTINGS = {
+  masterVolume: 1.0,
+  bgmVolume: 1.0,
+  sfxVolume: 1.0,
+  vibrate: true,
+  screenShake: true,
+};
+
 export default class GameInfo extends Emitter {
   constructor() {
     super();
@@ -47,26 +59,34 @@ export default class GameInfo extends Emitter {
     this._countdownValue = 0;        /* 倒计时秒数 */
     this._bestScoreSaved = false;    /* 最佳成绩是否已保存 */
 
-    /* 暂停按钮（左上角，音效按钮右边） */
+    /* 暂停按钮（左上角） */
     this.pauseBtnArea = {
-      startX: 50,
+      startX: 10,
       startY: 8,
-      endX: 90,
+      endX: 46,
       endY: 42,
     };
 
     /* 暂停面板按钮 */
     this.resumeBtnArea = {
       startX: SCREEN_WIDTH / 2 - 80,
-      startY: SCREEN_HEIGHT / 2 - 10,
+      startY: SCREEN_HEIGHT / 2 - 40,
       endX: SCREEN_WIDTH / 2 + 80,
-      endY: SCREEN_HEIGHT / 2 + 30,
+      endY: SCREEN_HEIGHT / 2 + 0,
     };
     this.quitBtnArea = {
       startX: SCREEN_WIDTH / 2 - 80,
-      startY: SCREEN_HEIGHT / 2 + 40,
+      startY: SCREEN_HEIGHT / 2 + 10,
       endX: SCREEN_WIDTH / 2 + 80,
-      endY: SCREEN_HEIGHT / 2 + 80,
+      endY: SCREEN_HEIGHT / 2 + 50,
+    };
+
+    /* 暂停面板设置按钮 */
+    this.pauseSettingsBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 80,
+      startY: SCREEN_HEIGHT / 2 + 60,
+      endX: SCREEN_WIDTH / 2 + 80,
+      endY: SCREEN_HEIGHT / 2 + 100,
     };
 
     /* 游戏结束按钮 */
@@ -108,14 +128,72 @@ export default class GameInfo extends Emitter {
     this.heartImg = wx.createImage();
     this.heartImg.src = 'images/heart_full.png';
 
-    /* 音效开关按钮（左上角，暂停按钮左边） */
-    this._soundMuted = false;
-    this.soundBtnArea = {
-      startX: 10,
+    /* ========== 设置系统 ========== */
+    this.settings = this._loadSettings();
+    /* 同步到全局，供 main.js / player/index.js 使用 */
+    GameGlobal.settings = this.settings;
+    /* 同步音量通道到 Sound 管理器 */
+    this._applySettingsToSound();
+
+    /* 主页设置按钮（右上角） */
+    this.homeSettingsBtnArea = {
+      startX: SCREEN_WIDTH - 46,
       startY: 8,
-      endX: 44,
+      endX: SCREEN_WIDTH - 8,
       endY: 42,
     };
+
+    /* ========== 设置面板区域（在 430×932 设计分辨率下居中） ========== */
+    this._panelX = SCREEN_WIDTH / 2 - 140;
+    this._panelY = SCREEN_HEIGHT / 2 - 180;
+    this._panelW = 280;
+    this._panelH = 370;
+
+    /* 设置面板上的音量滑动条区域（动态计算，用于触摸交互） */
+    this._sliderAreas = {
+      master: { label: '总音量', y: 55 },
+      bgm: { label: '背景音乐', y: 105 },
+      sfx: { label: '音效', y: 155 },
+    };
+
+    /* 设置面板上的复选框区域 */
+    this._checkAreas = {
+      vibrate: { label: '受伤震动', y: 210 },
+      screenShake: { label: '屏幕抖动', y: 250 },
+    };
+
+    /* 设置面板返回按钮 */
+    this.settingsBackBtnArea = {
+      startX: this._panelX + 20,
+      startY: this._panelY + this._panelH - 55,
+      endX: this._panelX + this._panelW - 20,
+      endY: this._panelY + this._panelH - 20,
+    };
+  }
+
+  /* ========== 设置持久化 ========== */
+  _loadSettings() {
+    try {
+      const saved = wx.getStorageSync(SETTINGS_KEY);
+      if (saved) {
+        return { ...DEFAULT_SETTINGS, ...saved };
+      }
+    } catch (e) { /* 忽略 */ }
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  _saveSettings() {
+    try {
+      wx.setStorageSync(SETTINGS_KEY, this.settings);
+    } catch (e) { /* 忽略 */ }
+  }
+
+  _applySettingsToSound() {
+    if (GameGlobal.sound) {
+      GameGlobal.sound.setVolume('master', this.settings.masterVolume);
+      GameGlobal.sound.setVolume('bgm', this.settings.bgmVolume);
+      GameGlobal.sound.setVolume('sfx', this.settings.sfxVolume);
+    }
   }
 
   /* ========== 主页渲染 ========== */
@@ -159,8 +237,8 @@ export default class GameInfo extends Emitter {
       ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
     }
 
-    /* 音效开关按钮 */
-    this._renderSoundBtn(ctx);
+    /* 设置按钮（右上角） */
+    this._renderSettingsBtn(ctx, this.homeSettingsBtnArea);
 
     /* 排行榜按钮 */
     const lbBtn = this.leaderboardBtnArea;
@@ -357,9 +435,6 @@ export default class GameInfo extends Emitter {
       this._renderHearts(ctx, databus);
     }
 
-    /* 音效开关按钮（始终显示） */
-    this._renderSoundBtn(ctx);
-
     /* 游戏结束 */
     if (databus.isGameOver) {
       this.renderGameOver(ctx);
@@ -521,7 +596,7 @@ export default class GameInfo extends Emitter {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 28px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('游戏暂停', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60);
+    ctx.fillText('游戏暂停', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100);
 
     /* 继续按钮 */
     const resBtn = this.resumeBtnArea;
@@ -546,6 +621,16 @@ export default class GameInfo extends Emitter {
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
     ctx.fillText('结束游戏', (quitBtn.startX + quitBtn.endX) / 2, (quitBtn.startY + quitBtn.endY) / 2);
+
+    /* 设置按钮 */
+    const setBtn = this.pauseSettingsBtnArea;
+    ctx.fillStyle = '#9C27B0';
+    ctx.strokeStyle = '#6A1B9A';
+    this._roundRect(ctx, setBtn.startX, setBtn.startY, setBtn.endX - setBtn.startX, setBtn.endY - setBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('设置', (setBtn.startX + setBtn.endX) / 2, (setBtn.startY + setBtn.endY) / 2);
   }
 
   /* ========== 倒计时 ========== */
@@ -569,26 +654,158 @@ export default class GameInfo extends Emitter {
     ctx.fillText(String(num), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
   }
 
-  /* ========== 音效开关 ========== */
-  _renderSoundBtn(ctx) {
-    const btn = this.soundBtnArea;
-    const w = btn.endX - btn.startX;
-    const h = btn.endY - btn.startY;
+  /* ========== 设置按钮 ========== */
+  _renderSettingsBtn(ctx, area) {
+    const w = area.endX - area.startX;
+    const h = area.endY - area.startY;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    this._roundRect(ctx, btn.startX, btn.startY, w, h, 6);
+    this._roundRect(ctx, area.startX, area.startY, w, h, 6);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px Arial';
+    ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(this._soundMuted ? '🔇' : '🔊', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2);
+    ctx.fillText('⚙', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2);
   }
 
-  _toggleSound() {
-    this._soundMuted = !this._soundMuted;
-    if (GameGlobal.sound) {
-      GameGlobal.sound.setMuted(this._soundMuted);
+  /* ========== 设置面板渲染 ========== */
+  renderSettings(ctx) {
+    /* 半透明背景 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 面板背景 */
+    const px = this._panelX;
+    const py = this._panelY;
+    const pw = this._panelW;
+    const ph = this._panelH;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, px, py, pw, ph, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    /* 标题 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('设置', SCREEN_WIDTH / 2, py + 28);
+
+    /* 分割线 */
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 20, py + 48);
+    ctx.lineTo(px + pw - 20, py + 48);
+    ctx.stroke();
+
+    /* 音量滑动条 */
+    const sliderLeft = px + 20;
+    const sliderW = pw - 60;
+    const thumbR = 8;
+
+    let sliderIdx = 0;
+    for (const [key, cfg] of Object.entries(this._sliderAreas)) {
+      const sy = py + cfg.y;
+      const value = this.settings[key + 'Volume'];
+
+      /* 标签 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cfg.label, sliderLeft, sy);
+
+      /* 滑条背景 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      this._roundRect(ctx, sliderLeft, sy + 16, sliderW, 6, 3);
+      ctx.fill();
+
+      /* 滑条进度 */
+      ctx.fillStyle = '#2196F3';
+      this._roundRect(ctx, sliderLeft, sy + 16, sliderW * value, 6, 3);
+      ctx.fill();
+
+      /* 滑块 */
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sliderLeft + sliderW * value, sy + 19, thumbR, 0, Math.PI * 2);
+      ctx.fill();
+
+      /* 数值百分比 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(value * 100) + '%', px + pw - 20, sy);
+
+      /* 存储滑块区域用于触摸检测 */
+      this._sliderAreas[key]._area = {
+        startX: sliderLeft,
+        startY: sy + 16 - 6,
+        endX: sliderLeft + sliderW,
+        endY: sy + 16 + 6 + 6,
+      };
+
+      sliderIdx++;
     }
+
+    /* 复选框 */
+    for (const [key, cfg] of Object.entries(this._checkAreas)) {
+      const cy = py + cfg.y;
+      const checked = this.settings[key];
+
+      /* 复选框框 */
+      const boxSize = 20;
+      const boxX = sliderLeft;
+      const boxY = cy - 6;
+      ctx.strokeStyle = checked ? '#2196F3' : 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 2;
+      this._roundRect(ctx, boxX, boxY, boxSize, boxSize, 4);
+      ctx.stroke();
+
+      if (checked) {
+        /* 勾选标记 */
+        ctx.strokeStyle = '#2196F3';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(boxX + 4, boxY + 10);
+        ctx.lineTo(boxX + 9, boxY + 15);
+        ctx.lineTo(boxX + 16, boxY + 5);
+        ctx.stroke();
+      }
+
+      /* 标签 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cfg.label, boxX + 30, cy);
+
+      /* 存储复选框区域 */
+      this._checkAreas[key]._area = {
+        startX: boxX,
+        startY: boxY,
+        endX: boxX + boxSize + 150,
+        endY: boxY + boxSize,
+      };
+    }
+
+    /* 返回按钮 */
+    const backBtn = this.settingsBackBtnArea;
+    ctx.fillStyle = '#4CAF50';
+    ctx.strokeStyle = '#2E7D32';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, backBtn.startX, backBtn.startY, backBtn.endX - backBtn.startX, backBtn.endY - backBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
   }
 
   /* 检测点是否在按钮区域内 */
@@ -605,11 +822,17 @@ export default class GameInfo extends Emitter {
     const game = toGameCoord(clientX, clientY);
     if (GameGlobal.DEBUG_LOG) console.log('[Touch] screenState:', GameGlobal.screenState, 'screen:', clientX, clientY, 'game:', game.x.toFixed(1), game.y.toFixed(1));
 
-    /* 主页：点击开始按钮 */
+    /* ===== 设置面板：处理内部交互 ===== */
+    if (GameGlobal.screenState === 'settings') {
+      this._handleSettingsTouch(game);
+      return;
+    }
+
+    /* ===== 主页 ===== */
     if (GameGlobal.screenState === 'home') {
-      /* 音效开关 */
-      if (this._isInArea(game, this.soundBtnArea)) {
-        this._toggleSound();
+      /* 设置按钮 */
+      if (this._isInArea(game, this.homeSettingsBtnArea)) {
+        this.emit('showSettings');
         return;
       }
       if (GameGlobal.DEBUG_LOG) console.log('[Touch] 主页触摸:', game.x, game.y,
@@ -638,7 +861,7 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 排行榜：记录起始触摸位置用于滚动 */
+    /* ===== 排行榜 ===== */
     if (GameGlobal.screenState === 'leaderboard') {
       this._touchStartY = game.y;
       this._scrollStartY = this._leaderboardScrollY;
@@ -654,14 +877,8 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 游戏中 / 准备中：点击屏幕任意位置 = 跳跃 */
+    /* ===== 游戏中 / 准备中 ===== */
     if (GameGlobal.screenState === 'playing' || GameGlobal.screenState === 'ready') {
-      /* 音效开关 */
-      if (this._isInArea(game, this.soundBtnArea)) {
-        this._toggleSound();
-        return;
-      }
-
       /* 检查暂停按钮 */
       if (GameGlobal.screenState === 'playing') {
         if (
@@ -703,7 +920,7 @@ export default class GameInfo extends Emitter {
       return;
     }
 
-    /* 暂停状态：点击继续或结束 */
+    /* ===== 暂停状态 ===== */
     if (GameGlobal.screenState === 'paused') {
       if (
         game.x >= this.resumeBtnArea.startX &&
@@ -721,14 +938,24 @@ export default class GameInfo extends Emitter {
         game.y <= this.quitBtnArea.endY
       ) {
         this.emit('quitToHome');
+        return;
+      }
+      if (
+        game.x >= this.pauseSettingsBtnArea.startX &&
+        game.x <= this.pauseSettingsBtnArea.endX &&
+        game.y >= this.pauseSettingsBtnArea.startY &&
+        game.y <= this.pauseSettingsBtnArea.endY
+      ) {
+        this.emit('showSettings');
+        return;
       }
       return;
     }
 
-    /* 倒计时中：忽略点击 */
+    /* ===== 倒计时中：忽略点击 ===== */
     if (GameGlobal.screenState === 'countdown') return;
 
-    /* 游戏结束：点击按钮 */
+    /* ===== 游戏结束 ===== */
     if (!GameGlobal.databus || !GameGlobal.databus.isGameOver) return;
 
     if (
@@ -748,6 +975,47 @@ export default class GameInfo extends Emitter {
       game.y <= this.menuBtnArea.endY
     ) {
       this.emit('backToHome');
+    }
+  }
+
+  /* ========== 设置面板触摸处理 ========== */
+  _handleSettingsTouch(game) {
+    /* 返回按钮 */
+    if (this._isInArea(game, this.settingsBackBtnArea)) {
+      this.emit('hideSettings');
+      return;
+    }
+
+    /* 音量滑动条交互 */
+    for (const [key, cfg] of Object.entries(this._sliderAreas)) {
+      const area = cfg._area;
+      if (!area) continue;
+      if (game.x >= area.startX && game.x <= area.endX &&
+          game.y >= area.startY && game.y <= area.endY) {
+        /* 计算滑块值 */
+        const sliderW = area.endX - area.startX;
+        const rawValue = (game.x - area.startX) / sliderW;
+        const value = Math.max(0, Math.min(1, rawValue));
+        const settingKey = key + 'Volume';
+        this.settings[settingKey] = value;
+        GameGlobal.settings[settingKey] = value;
+        this._saveSettings();
+        this._applySettingsToSound();
+        return;
+      }
+    }
+
+    /* 复选框交互 */
+    for (const [key, cfg] of Object.entries(this._checkAreas)) {
+      const area = cfg._area;
+      if (!area) continue;
+      if (game.x >= area.startX && game.x <= area.endX &&
+          game.y >= area.startY && game.y <= area.endY) {
+        this.settings[key] = !this.settings[key];
+        GameGlobal.settings[key] = this.settings[key];
+        this._saveSettings();
+        return;
+      }
     }
   }
 
