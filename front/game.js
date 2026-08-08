@@ -36,10 +36,8 @@ function fetchWxNickName(retries = 3, delay = 1000) {
 /* 挂载到 GameGlobal，供其他模块在需要时调用 */
 GameGlobal.fetchWxNickName = fetchWxNickName;
 
-/* 关闭调试模式，确保体验版不会出现红字和 vConsole 悬浮球 */
-if (typeof wx.setEnableDebug === 'function') {
-  wx.setEnableDebug({ enableDebug: false });
-}
+/* 调试模式默认关闭，开发者可在微信开发工具中手动开启调试 */
+/* 此处不调用 wx.setEnableDebug(false)，以保留手动开启调试的能力 */
 
 /* 加载本地缓存的玩家昵称 */
 try {
