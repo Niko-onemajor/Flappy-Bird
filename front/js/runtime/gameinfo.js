@@ -76,17 +76,17 @@ export default class GameInfo extends Emitter {
     };
     this.quitBtnArea = {
       startX: SCREEN_WIDTH / 2 - 80,
-      startY: SCREEN_HEIGHT / 2 + 10,
-      endX: SCREEN_WIDTH / 2 + 80,
-      endY: SCREEN_HEIGHT / 2 + 50,
-    };
-
-    /* 暂停面板设置按钮 */
-    this.pauseSettingsBtnArea = {
-      startX: SCREEN_WIDTH / 2 - 80,
       startY: SCREEN_HEIGHT / 2 + 60,
       endX: SCREEN_WIDTH / 2 + 80,
       endY: SCREEN_HEIGHT / 2 + 100,
+    };
+
+    /* 暂停面板设置按钮（放在继续和结束之间） */
+    this.pauseSettingsBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 80,
+      startY: SCREEN_HEIGHT / 2 + 10,
+      endX: SCREEN_WIDTH / 2 + 80,
+      endY: SCREEN_HEIGHT / 2 + 50,
     };
 
     /* 游戏结束按钮 */
@@ -135,11 +135,11 @@ export default class GameInfo extends Emitter {
     /* 同步音量通道到 Sound 管理器 */
     this._applySettingsToSound();
 
-    /* 主页设置按钮（右上角） */
+    /* 主页设置按钮（左上角） */
     this.homeSettingsBtnArea = {
-      startX: SCREEN_WIDTH - 46,
+      startX: 10,
       startY: 8,
-      endX: SCREEN_WIDTH - 8,
+      endX: 46,
       endY: 42,
     };
 
@@ -612,17 +612,7 @@ export default class GameInfo extends Emitter {
     ctx.textBaseline = 'middle';
     ctx.fillText('继续游戏', (resBtn.startX + resBtn.endX) / 2, (resBtn.startY + resBtn.endY) / 2);
 
-    /* 结束按钮 */
-    const quitBtn = this.quitBtnArea;
-    ctx.fillStyle = '#f44336';
-    ctx.strokeStyle = '#B71C1C';
-    this._roundRect(ctx, quitBtn.startX, quitBtn.startY, quitBtn.endX - quitBtn.startX, quitBtn.endY - quitBtn.startY, 10);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('结束游戏', (quitBtn.startX + quitBtn.endX) / 2, (quitBtn.startY + quitBtn.endY) / 2);
-
-    /* 设置按钮 */
+    /* 设置按钮（第二行） */
     const setBtn = this.pauseSettingsBtnArea;
     ctx.fillStyle = '#9C27B0';
     ctx.strokeStyle = '#6A1B9A';
@@ -631,6 +621,16 @@ export default class GameInfo extends Emitter {
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
     ctx.fillText('设置', (setBtn.startX + setBtn.endX) / 2, (setBtn.startY + setBtn.endY) / 2);
+
+    /* 结束按钮（第三行） */
+    const quitBtn = this.quitBtnArea;
+    ctx.fillStyle = '#f44336';
+    ctx.strokeStyle = '#B71C1C';
+    this._roundRect(ctx, quitBtn.startX, quitBtn.startY, quitBtn.endX - quitBtn.startX, quitBtn.endY - quitBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('结束游戏', (quitBtn.startX + quitBtn.endX) / 2, (quitBtn.startY + quitBtn.endY) / 2);
   }
 
   /* ========== 倒计时 ========== */
