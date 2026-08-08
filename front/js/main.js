@@ -780,7 +780,7 @@ export default class Main {
   loop() {
     try {
       /* 60fps 帧率限制：确保高刷屏(120Hz+)上游戏速度一致 */
-      const now = performance.now();
+      const now = Date.now();
       const elapsed = now - this._lastFrameTime;
       if (elapsed >= this._frameInterval) {
         /* 对齐到帧间隔边界，防止累积漂移 */
