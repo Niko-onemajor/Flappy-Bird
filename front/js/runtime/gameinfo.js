@@ -289,15 +289,6 @@ export default class GameInfo extends Emitter {
     const listTop = tableTop + headerH;
     const listBottom = SCREEN_HEIGHT - 20;
 
-    /* 惯性滚动更新 */
-    if (!this._isTouching && Math.abs(this._scrollVelocity) > 0.5) {
-      this._leaderboardScrollY += this._scrollVelocity;
-      this._scrollVelocity *= 0.92;  /* 摩擦力衰减 */
-    } else if (!this._isTouching) {
-      this._scrollVelocity = 0;
-    }
-    this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
-
     /* 半透明背景 */
     ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -353,9 +344,18 @@ export default class GameInfo extends Emitter {
     ctx.lineTo(SCREEN_WIDTH - 20, tableTop + headerH - 10);
     ctx.stroke();
 
-    /* 计算最大滚动量 */
+    /* 先计算最大滚动量，再 clamping 确保同步 */
     const listHeight = listBottom - listTop;
     this._leaderboardMaxScroll = Math.max(0, data.length * rowH - listHeight);
+
+    /* 惯性滚动更新 */
+    if (!this._isTouching && Math.abs(this._scrollVelocity) > 0.5) {
+      this._leaderboardScrollY += this._scrollVelocity;
+      this._scrollVelocity *= 0.92;  /* 摩擦力衰减 */
+    } else if (!this._isTouching) {
+      this._scrollVelocity = 0;
+    }
+    this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
 
     /* 裁剪滚动区域 */
     ctx.save();
@@ -1314,14 +1314,16 @@ export default class GameInfo extends Emitter {
     const { clientY } = event.touches[0];
     const game = toGameCoord(0, clientY);
     const delta = this._touchStartY - game.y;
+    const prevScrollY = this._leaderboardScrollY;
     this._leaderboardScrollY = this._scrollStartY + delta;
     this._leaderboardScrollY = Math.max(0, Math.min(this._leaderboardScrollY, this._leaderboardMaxScroll));
 
-    /* 记录速度用于惯性滚动 */
+    /* 记录速度用于惯性滚动（基于增量位移，非总位移） */
     const now = Date.now();
     const dt = now - this._lastTouchMoveTime;
     if (dt > 0 && dt < 100) {
-      this._scrollVelocity = -delta * 0.3;  /* 速度因子 */
+      const scrollDelta = this._leaderboardScrollY - prevScrollY;
+      this._scrollVelocity = scrollDelta * 0.3;  /* 速度因子 */
     }
     this._lastTouchMoveTime = now;
     this._isTouching = true;
