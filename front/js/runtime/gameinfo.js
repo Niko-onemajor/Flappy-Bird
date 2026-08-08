@@ -485,8 +485,9 @@ export default class GameInfo extends Emitter {
   }
 
   /* 用数字图片绘制分数（支持里程碑视觉特效）
-   * effectTimer > 0 时触发特效：金色辉光面板 + 弹性放大 + Y轴弹跳
-   * effectTimer > 100 时视为持久模式（游戏结束卡片），使用呼吸动画替代单次衰减 */
+   * effectTimer > 0 时触发特效：金色辉光面板 + 逐字径向光晕 + 弹性放大 + Y轴弹跳
+   * effectTimer > 100 时视为持久模式（游戏结束卡片），使用呼吸动画替代单次衰减
+   * 性能说明：使用径向渐变替代 ctx.shadowBlur，避免高斯模糊滤波带来的移动端掉帧 */
   _drawScore(ctx, score, cx, cy, gap = 4, effectTimer = 0) {
     const digits = String(score).split('');
     const numW = 24;
@@ -510,36 +511,48 @@ export default class GameInfo extends Emitter {
       glowAlpha = 0.6 * progress;          /* 辉光强度 */
     }
 
-    /* 金色辉光背景面板（替代昂贵的 shadowBlur，避免移动端掉帧） */
+    /* 1. 金色辉光背景面板（整体辉光氛围） */
     if (hasEffect && glowAlpha > 0.01) {
       ctx.save();
-      const padX = 12;
-      const padY = 10;
-      const panelX = startX - padX;
-      const panelY = cy - numH / 2 - padY;
-      const panelW = totalW + padX * 2;
-      const panelH = numH + padY * 2;
-
-      /* 辉光填充 */
-      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.15})`;
-      this._roundRect(ctx, panelX, panelY, panelW, panelH, 10);
+      const padX = 14;
+      const padY = 12;
+      /* 外层柔光 */
+      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.08})`;
+      this._roundRect(ctx, startX - padX - 4, cy - numH / 2 - padY - 4, totalW + padX * 2 + 8, numH + padY * 2 + 8, 14);
       ctx.fill();
-
+      /* 内层辉光 */
+      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.12})`;
+      this._roundRect(ctx, startX - padX, cy - numH / 2 - padY, totalW + padX * 2, numH + padY * 2, 10);
+      ctx.fill();
       /* 金色边框 */
-      ctx.strokeStyle = `rgba(255, 215, 0, ${glowAlpha * 0.35})`;
+      ctx.strokeStyle = `rgba(255, 215, 0, ${glowAlpha * 0.3})`;
       ctx.lineWidth = 1.5;
-      this._roundRect(ctx, panelX, panelY, panelW, panelH, 10);
+      this._roundRect(ctx, startX - padX, cy - numH / 2 - padY, totalW + padX * 2, numH + padY * 2, 10);
       ctx.stroke();
       ctx.restore();
     }
 
     for (let i = 0; i < digits.length; i++) {
-      const d = parseInt(digits[i]);
+      const d = +digits[i];
       if (!this.numImgs[d]) continue;
+
+      const digitCx = startX + i * step + numW / 2;
 
       if (hasEffect) {
         ctx.save();
-        const digitCx = startX + i * step + numW / 2;
+
+        /* 2. 每位数独享径向光晕（模拟 shadowBlur 的逐字发光效果，性能开销低得多） */
+        if (glowAlpha > 0.01) {
+          const grad = ctx.createRadialGradient(digitCx, cy, 0, digitCx, cy, numW * 0.85);
+          grad.addColorStop(0, `rgba(255, 215, 0, ${glowAlpha * 0.4})`);
+          grad.addColorStop(0.5, `rgba(255, 200, 0, ${glowAlpha * 0.15})`);
+          grad.addColorStop(1, `rgba(255, 200, 0, 0)`);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(digitCx, cy, numW * 0.85, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
         ctx.translate(digitCx, cy + extraY);
         ctx.scale(scale, scale);
         ctx.drawImage(this.numImgs[d], -numW / 2, -numH / 2, numW, numH);
