@@ -1030,9 +1030,9 @@ export default class GameInfo extends Emitter {
     }
 
     const panelW = 300;
-    const panelH = 240;
+    const panelH = 220;
     const px = (SCREEN_WIDTH - panelW) / 2;
-    const py = (SCREEN_HEIGHT - panelH) / 2 - 20;
+    const py = (SCREEN_HEIGHT - panelH) / 2;
 
     /* 半透明遮罩 */
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
@@ -1434,9 +1434,9 @@ export default class GameInfo extends Emitter {
       }
       /* 点击对话框外区域关闭 */
       const panelW = 300;
-      const panelH = 240;
+      const panelH = 220;
       const px = (SCREEN_WIDTH - panelW) / 2;
-      const py = (SCREEN_HEIGHT - panelH) / 2 - 20;
+      const py = (SCREEN_HEIGHT - panelH) / 2;
       if (game.x < px || game.x > px + panelW || game.y < py || game.y > py + panelH) {
         this._closeNameDialog();
       }

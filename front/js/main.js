@@ -758,10 +758,10 @@ export default class Main {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    /* 4. 自定义昵称对话框（渲染在最顶层，屏幕坐标系） */
+    /* 4. 自定义昵称对话框（渲染在最顶层，使用游戏坐标系确保触摸检测一致） */
     if (this.gameInfo._showNameDialog) {
       ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(GAME_SCALE, 0, 0, GAME_SCALE, GAME_OFFSET_X, GAME_OFFSET_Y);
       this.gameInfo._renderNameDialog(ctx);
       ctx.restore();
     }
