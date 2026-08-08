@@ -99,7 +99,7 @@ export default class BackGround {
     ctx.fillStyle = this._skyGradient;
     ctx.fillRect(0, 0, screenW, groundY);
 
-    /* 3. 天空背景图片平铺 - 使用离屏缓存 */
+    /* 3. 天空背景图片平铺 - 优先使用离屏缓存，失败时回退到直接平铺 */
     if (gameGroundY > 0) {
       const bgScale = gameGroundY / BG_IMG_H;
       const bgTileW = BG_IMG_W * bgScale;
@@ -109,22 +109,39 @@ export default class BackGround {
       if (this._bgTileCacheFull) {
         const modOffset = (this.bgOffsetX * bgScale) % bgTileW;
         ctx.drawImage(this._bgTileCacheFull, modOffset, 0, screenW, gameGroundY, 0, 0, screenW, gameGroundY);
+      } else {
+        /* 回退：直接平铺（图片未加载时静默跳过，后续帧自动恢复） */
+        const tilesNeeded = Math.ceil(screenW / bgTileW) + 2;
+        for (let i = 0; i < tilesNeeded; i++) {
+          ctx.drawImage(this.bgImg, i * bgTileW - this.bgOffsetX * bgScale, 0, bgTileW, gameGroundY);
+        }
       }
     }
 
-    /* 4. 地面平铺 - 使用离屏缓存 */
+    /* 4. 地面平铺 - 优先使用离屏缓存，失败时回退到直接平铺 */
     if (!this._groundTileCacheFull) {
       this._buildGroundTileCacheFull(screenW, groundTileW, groundH);
     }
     if (this._groundTileCacheFull) {
       const modOffset = (this.baseX * GAME_SCALE) % groundTileW;
       ctx.drawImage(this._groundTileCacheFull, modOffset, 0, screenW, groundH, 0, groundY, screenW, groundH);
+    } else {
+      /* 回退：直接平铺（图片未加载时静默跳过，后续帧自动恢复） */
+      const tilesNeeded = Math.ceil(screenW / groundTileW) + 2;
+      for (let i = 0; i < tilesNeeded; i++) {
+        ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
+      }
     }
   }
 
   /** 构建全屏天空背景离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
   _buildBgTileCacheFull(screenW, tileW, tileH, scale) {
     try {
+      /* 图片未加载时跳过，后续帧自动重试 */
+      if (!this.bgImg || !this.bgImg.width || !this.bgImg.height) {
+        this._bgTileCacheFull = null;
+        return;
+      }
       const cache = wx.createCanvas();
       const tilesNeeded = Math.ceil(screenW / tileW) + 2;
       cache.width = tilesNeeded * tileW;
@@ -143,6 +160,11 @@ export default class BackGround {
   /** 构建全屏地面离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
   _buildGroundTileCacheFull(screenW, tileW, tileH) {
     try {
+      /* 图片未加载时跳过，后续帧自动重试 */
+      if (!this.baseImg || !this.baseImg.width || !this.baseImg.height) {
+        this._groundTileCacheFull = null;
+        return;
+      }
       const cache = wx.createCanvas();
       const tilesNeeded = Math.ceil(screenW / tileW) + 2;
       cache.width = tilesNeeded * tileW;
