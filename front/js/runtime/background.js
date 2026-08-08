@@ -46,13 +46,6 @@ export default class BackGround {
     /* 预计算全屏渲染用常量（避免每帧重复计算） */
     this._groundH = GROUND.HEIGHT * GAME_SCALE;
     this._groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
-
-    /* 离屏 Canvas 缓存（减少每帧 drawImage 调用次数） */
-    this._bgTileCache = null;   /* 背景平铺缓存 */
-    this._groundTileCache = null; /* 地面平铺缓存 */
-    this._bgTileCacheFull = null; /* 全屏背景平铺缓存 */
-    this._groundTileCacheFull = null; /* 全屏地面平铺缓存 */
-    this._cacheReady = false;
   }
 
   update() {
@@ -99,84 +92,35 @@ export default class BackGround {
     ctx.fillStyle = this._skyGradient;
     ctx.fillRect(0, 0, screenW, groundY);
 
-    /* 3. 天空背景图片平铺 - 优先使用离屏缓存，失败时回退到直接平铺 */
-    if (gameGroundY > 0) {
+    /* 3. 天空背景图片平铺（直接绘制，避免离屏 Canvas 创建开销） */
+    if (gameGroundY > 0 && this._isBgReady()) {
       const bgScale = gameGroundY / BG_IMG_H;
       const bgTileW = BG_IMG_W * bgScale;
-      if (!this._bgTileCacheFull) {
-        this._buildBgTileCacheFull(screenW, bgTileW, gameGroundY, bgScale);
-      }
-      if (this._bgTileCacheFull) {
-        const modOffset = (this.bgOffsetX * bgScale) % bgTileW;
-        ctx.drawImage(this._bgTileCacheFull, modOffset, 0, screenW, gameGroundY, 0, 0, screenW, gameGroundY);
-      } else {
-        /* 回退：直接平铺（图片未加载时静默跳过，后续帧自动恢复） */
-        const tilesNeeded = Math.ceil(screenW / bgTileW) + 2;
-        for (let i = 0; i < tilesNeeded; i++) {
-          ctx.drawImage(this.bgImg, i * bgTileW - this.bgOffsetX * bgScale, 0, bgTileW, gameGroundY);
-        }
+      const modOffset = (this.bgOffsetX * bgScale) % bgTileW;
+      const tilesNeeded = Math.ceil(screenW / bgTileW) + 2;
+      for (let i = 0; i < tilesNeeded; i++) {
+        ctx.drawImage(this.bgImg, i * bgTileW - modOffset, 0, bgTileW, gameGroundY);
       }
     }
 
-    /* 4. 地面平铺 - 优先使用离屏缓存，失败时回退到直接平铺 */
-    if (!this._groundTileCacheFull) {
-      this._buildGroundTileCacheFull(screenW, groundTileW, groundH);
-    }
-    if (this._groundTileCacheFull) {
+    /* 4. 地面平铺（直接绘制，避免离屏 Canvas 创建开销） */
+    if (this._isGroundReady()) {
       const modOffset = (this.baseX * GAME_SCALE) % groundTileW;
-      ctx.drawImage(this._groundTileCacheFull, modOffset, 0, screenW, groundH, 0, groundY, screenW, groundH);
-    } else {
-      /* 回退：直接平铺（图片未加载时静默跳过，后续帧自动恢复） */
       const tilesNeeded = Math.ceil(screenW / groundTileW) + 2;
       for (let i = 0; i < tilesNeeded; i++) {
-        ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
+        ctx.drawImage(this.baseImg, i * groundTileW - modOffset, groundY, groundTileW, groundH);
       }
     }
   }
 
-  /** 构建全屏天空背景离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
-  _buildBgTileCacheFull(screenW, tileW, tileH, scale) {
-    try {
-      /* 图片未加载时跳过，后续帧自动重试 */
-      if (!this.bgImg || !this.bgImg.width || !this.bgImg.height) {
-        this._bgTileCacheFull = null;
-        return;
-      }
-      const cache = wx.createCanvas();
-      const tilesNeeded = Math.ceil(screenW / tileW) + 2;
-      cache.width = tilesNeeded * tileW;
-      cache.height = tileH;
-      const cctx = cache.getContext('2d');
-      for (let i = 0; i < tilesNeeded; i++) {
-        cctx.drawImage(this.bgImg, i * tileW, 0, tileW, tileH);
-      }
-      this._bgTileCacheFull = cache;
-    } catch (e) {
-      /* 离屏缓存失败时回退到非缓存方式 */
-      this._bgTileCacheFull = null;
-    }
+  /** 检查背景图片是否已加载完成 */
+  _isBgReady() {
+    return this.bgImg && this.bgImg.width > 0 && this.bgImg.height > 0;
   }
 
-  /** 构建全屏地面离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
-  _buildGroundTileCacheFull(screenW, tileW, tileH) {
-    try {
-      /* 图片未加载时跳过，后续帧自动重试 */
-      if (!this.baseImg || !this.baseImg.width || !this.baseImg.height) {
-        this._groundTileCacheFull = null;
-        return;
-      }
-      const cache = wx.createCanvas();
-      const tilesNeeded = Math.ceil(screenW / tileW) + 2;
-      cache.width = tilesNeeded * tileW;
-      cache.height = tileH;
-      const cctx = cache.getContext('2d');
-      for (let i = 0; i < tilesNeeded; i++) {
-        cctx.drawImage(this.baseImg, i * tileW, 0, tileW, tileH);
-      }
-      this._groundTileCacheFull = cache;
-    } catch (e) {
-      this._groundTileCacheFull = null;
-    }
+  /** 检查地面图片是否已加载完成 */
+  _isGroundReady() {
+    return this.baseImg && this.baseImg.width > 0 && this.baseImg.height > 0;
   }
 
   /* 绘制天空背景（水平视差滚动，动态平铺适配任意屏幕宽度） */
