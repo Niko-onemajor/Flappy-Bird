@@ -39,6 +39,10 @@ export default class Player extends Sprite {
   flapIndex = 0;        /* 翅膀动画帧索引 */
   flapCounter = 0;      /* 翅膀动画计时器 */
 
+  /* 护盾离屏缓存（避免每帧 shadowBlur 开销） */
+  _shieldCache = null;
+  _shieldCacheKey = 0;  /* 基于 effectPhase 截断的缓存键 */
+
   constructor() {
     super(BIRD_FRAMES[0], BIRD_WIDTH, BIRD_HEIGHT);
     this._loadFrames();
@@ -61,6 +65,8 @@ export default class Player extends Sprite {
     this.effectPhase = 0;
     this.flapIndex = 0;
     this.flapCounter = 0;
+    this._shieldCache = null;
+    this._shieldCacheKey = 0;
   }
 
   update() {
@@ -183,32 +189,53 @@ export default class Player extends Sprite {
     }
   }
 
-  /* 护盾视觉特效 */
+  /* 护盾视觉特效（使用离屏缓存，仅每秒重建一次，避免每帧 shadowBlur 开销） */
   _renderShield(ctx, cx, cy) {
-    const pulse = 1 + Math.sin(this.effectPhase * 3) * 0.08;
-    const r = SHIELD_RADIUS * pulse;
+    /* 每30帧重建一次缓存（effectPhase 变化约每 1/0.05 = 20 帧变动一次，取30帧约0.5秒） */
+    const phaseKey = Math.floor(this.effectPhase * 20);
+    if (!this._shieldCache || this._shieldCacheKey !== phaseKey) {
+      this._shieldCacheKey = phaseKey;
+      try {
+        const pulse = 1 + Math.sin(this.effectPhase * 3) * 0.08;
+        const r = SHIELD_RADIUS * pulse;
+        const size = Math.ceil((r + 20) * 2);
+        const cache = wx.createCanvas();
+        cache.width = size;
+        cache.height = size;
+        const cctx = cache.getContext('2d');
+        const center = size / 2;
 
-    ctx.save();
-    ctx.shadowColor = '#FFD700';
-    ctx.shadowBlur = 15;
+        cctx.save();
+        cctx.shadowColor = '#FFD700';
+        cctx.shadowBlur = 15;
+        cctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+        cctx.lineWidth = 3;
+        cctx.beginPath();
+        cctx.arc(center, center, r, 0, Math.PI * 2);
+        cctx.stroke();
 
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
+        cctx.shadowBlur = 0;
+        cctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        cctx.lineWidth = 1.5;
+        cctx.setLineDash([8, 4]);
+        cctx.lineDashOffset = -this.effectPhase * 40;
+        cctx.beginPath();
+        cctx.arc(center, center, r - 5, 0, Math.PI * 2);
+        cctx.stroke();
+        cctx.setLineDash([]);
+        cctx.restore();
 
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8, 4]);
-    ctx.lineDashOffset = -this.effectPhase * 40;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - 5, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore();
+        this._shieldCache = cache;
+        this._shieldCacheSize = size;
+        this._shieldCacheR = r;
+      } catch (e) {
+        this._shieldCache = null;
+      }
+    }
+    if (this._shieldCache) {
+      const half = this._shieldCacheSize / 2;
+      ctx.drawImage(this._shieldCache, cx - half, cy - half);
+    }
   }
 
   _renderMultiplierIcon(ctx, cx, cy) {

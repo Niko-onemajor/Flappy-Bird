@@ -46,6 +46,13 @@ export default class BackGround {
     /* 预计算全屏渲染用常量（避免每帧重复计算） */
     this._groundH = GROUND.HEIGHT * GAME_SCALE;
     this._groundTileW = GROUND.IMG_WIDTH * GAME_SCALE;
+
+    /* 离屏 Canvas 缓存（减少每帧 drawImage 调用次数） */
+    this._bgTileCache = null;   /* 背景平铺缓存 */
+    this._groundTileCache = null; /* 地面平铺缓存 */
+    this._bgTileCacheFull = null; /* 全屏背景平铺缓存 */
+    this._groundTileCacheFull = null; /* 全屏地面平铺缓存 */
+    this._cacheReady = false;
   }
 
   update() {
@@ -78,36 +85,75 @@ export default class BackGround {
     const groundY = Math.min(gameGroundY, screenH - groundH);
 
     /* 1. 地面以下区域先用泥土色填充（防止浮点精度缝隙透出蓝色） */
-    if (groundY < screenH) {
-      ctx.fillStyle = '#DED895';
-      ctx.fillRect(0, groundY, screenW, screenH - groundY);
+    if (groundY + groundH < screenH) {
+      ctx.fillStyle = '#8B5E3C';
+      ctx.fillRect(0, groundY + groundH, screenW, screenH - groundY - groundH);
     }
 
-    /* 2. 天空渐变 - 仅填充地面以上区域（使用缓存渐变，避免每帧创建） */
-    if (groundY > 0) {
-      if (!this._skyGradient) {
-        this._skyGradient = ctx.createLinearGradient(0, 0, 0, screenH);
-        this._skyGradient.addColorStop(0, '#4DC9F6');
-        this._skyGradient.addColorStop(1, '#87CEEB');
-      }
-      ctx.fillStyle = this._skyGradient;
-      ctx.fillRect(0, 0, screenW, groundY);
+    /* 2. 天空背景渐变 */
+    if (!this._skyGradient) {
+      this._skyGradient = ctx.createLinearGradient(0, 0, 0, gameGroundY);
+      this._skyGradient.addColorStop(0, '#4DC9F6');
+      this._skyGradient.addColorStop(1, '#87CEEB');
     }
+    ctx.fillStyle = this._skyGradient;
+    ctx.fillRect(0, 0, screenW, groundY);
 
-    /* 3. 天空背景图片平铺 - 在地面以上区域 */
+    /* 3. 天空背景图片平铺 - 使用离屏缓存 */
     if (gameGroundY > 0) {
       const bgScale = gameGroundY / BG_IMG_H;
       const bgTileW = BG_IMG_W * bgScale;
-      const tilesNeeded = Math.ceil(screenW / bgTileW) + 2;
-      for (let i = 0; i < tilesNeeded; i++) {
-        ctx.drawImage(this.bgImg, i * bgTileW - this.bgOffsetX * bgScale, 0, bgTileW, gameGroundY);
+      if (!this._bgTileCacheFull) {
+        this._buildBgTileCacheFull(screenW, bgTileW, gameGroundY, bgScale);
+      }
+      if (this._bgTileCacheFull) {
+        const modOffset = (this.bgOffsetX * bgScale) % bgTileW;
+        ctx.drawImage(this._bgTileCacheFull, modOffset, 0, screenW, gameGroundY, 0, 0, screenW, gameGroundY);
       }
     }
 
-    /* 4. 地面平铺 - 覆盖泥土色区域 */
-    const groundTilesNeeded = Math.ceil(screenW / groundTileW) + 2;
-    for (let i = 0; i < groundTilesNeeded; i++) {
-      ctx.drawImage(this.baseImg, i * groundTileW - this.baseX * GAME_SCALE, groundY, groundTileW, groundH);
+    /* 4. 地面平铺 - 使用离屏缓存 */
+    if (!this._groundTileCacheFull) {
+      this._buildGroundTileCacheFull(screenW, groundTileW, groundH);
+    }
+    if (this._groundTileCacheFull) {
+      const modOffset = (this.baseX * GAME_SCALE) % groundTileW;
+      ctx.drawImage(this._groundTileCacheFull, modOffset, 0, screenW, groundH, 0, groundY, screenW, groundH);
+    }
+  }
+
+  /** 构建全屏天空背景离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
+  _buildBgTileCacheFull(screenW, tileW, tileH, scale) {
+    try {
+      const cache = wx.createCanvas();
+      const tilesNeeded = Math.ceil(screenW / tileW) + 2;
+      cache.width = tilesNeeded * tileW;
+      cache.height = tileH;
+      const cctx = cache.getContext('2d');
+      for (let i = 0; i < tilesNeeded; i++) {
+        cctx.drawImage(this.bgImg, i * tileW, 0, tileW, tileH);
+      }
+      this._bgTileCacheFull = cache;
+    } catch (e) {
+      /* 离屏缓存失败时回退到非缓存方式 */
+      this._bgTileCacheFull = null;
+    }
+  }
+
+  /** 构建全屏地面离屏缓存（以偏移0构建，渲染时由 modOffset 控制滚动） */
+  _buildGroundTileCacheFull(screenW, tileW, tileH) {
+    try {
+      const cache = wx.createCanvas();
+      const tilesNeeded = Math.ceil(screenW / tileW) + 2;
+      cache.width = tilesNeeded * tileW;
+      cache.height = tileH;
+      const cctx = cache.getContext('2d');
+      for (let i = 0; i < tilesNeeded; i++) {
+        cctx.drawImage(this.baseImg, i * tileW, 0, tileW, tileH);
+      }
+      this._groundTileCacheFull = cache;
+    } catch (e) {
+      this._groundTileCacheFull = null;
     }
   }
 
@@ -116,10 +162,58 @@ export default class BackGround {
     const w = this.bgDrawW;
     const h = this.bgDrawH;
 
-    /* 动态计算所需平铺块数：屏幕宽度 / 单块宽度，+2 覆盖滚动偏移 */
-    const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
-    for (let i = 0; i < tilesNeeded; i++) {
-      ctx.drawImage(this.bgImg, i * w - this.bgOffsetX, 0, w, h);
+    /* 使用离屏缓存加速 */
+    if (!this._bgTileCache) {
+      this._buildBgTileCache();
+    }
+    if (this._bgTileCache) {
+      const modOffset = this.bgOffsetX % w;
+      ctx.drawImage(this._bgTileCache, modOffset, 0, w, h, 0, 0, w, h);
+    } else {
+      /* 回退：直接平铺 */
+      const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+      for (let i = 0; i < tilesNeeded; i++) {
+        ctx.drawImage(this.bgImg, i * w - this.bgOffsetX, 0, w, h);
+      }
+    }
+  }
+
+  /** 构建背景平铺离屏缓存 */
+  _buildBgTileCache() {
+    const w = this.bgDrawW;
+    const h = this.bgDrawH;
+    try {
+      const cache = wx.createCanvas();
+      const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+      cache.width = tilesNeeded * w;
+      cache.height = h;
+      const cctx = cache.getContext('2d');
+      for (let i = 0; i < tilesNeeded; i++) {
+        cctx.drawImage(this.bgImg, i * w, 0, w, h);
+      }
+      this._bgTileCache = cache;
+    } catch (e) {
+      this._bgTileCache = null;
+    }
+  }
+
+  /** 构建地面平铺离屏缓存 */
+  _buildGroundTileCache() {
+    const baseY = SCREEN_HEIGHT - GROUND.HEIGHT;
+    const w = GROUND.IMG_WIDTH;
+    const h = GROUND.HEIGHT;
+    try {
+      const cache = wx.createCanvas();
+      const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+      cache.width = tilesNeeded * w;
+      cache.height = h;
+      const cctx = cache.getContext('2d');
+      for (let i = 0; i < tilesNeeded; i++) {
+        cctx.drawImage(this.baseImg, i * w, 0, w, h);
+      }
+      this._groundTileCache = cache;
+    } catch (e) {
+      this._groundTileCache = null;
     }
   }
 
@@ -129,10 +223,19 @@ export default class BackGround {
     const w = GROUND.IMG_WIDTH;
     const h = GROUND.HEIGHT;
 
-    /* 动态计算所需平铺块数 */
-    const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
-    for (let i = 0; i < tilesNeeded; i++) {
-      ctx.drawImage(this.baseImg, i * w - this.baseX, baseY, w, h);
+    /* 使用离屏缓存加速 */
+    if (!this._groundTileCache) {
+      this._buildGroundTileCache();
+    }
+    if (this._groundTileCache) {
+      const modOffset = this.baseX % w;
+      ctx.drawImage(this._groundTileCache, modOffset, 0, w, h, 0, baseY, w, h);
+    } else {
+      /* 回退：直接平铺 */
+      const tilesNeeded = Math.ceil(SCREEN_WIDTH / w) + 2;
+      for (let i = 0; i < tilesNeeded; i++) {
+        ctx.drawImage(this.baseImg, i * w - this.baseX, baseY, w, h);
+      }
     }
   }
 }

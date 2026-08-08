@@ -65,6 +65,15 @@ export default class GameInfo extends Emitter {
     this._showKeyboard = false;
     this._keyboardInput = '';
 
+    /* 自定义昵称对话框 */
+    this._showNameDialog = false;
+    this._nameDialogText = '';
+    this._nameDialogBtnPress = 0;       /* 确认按钮按压动画（帧数，>0表示按压中） */
+    this._nameDialogSuccess = false;    /* 设置成功标志 */
+    this._nameDialogSuccessTimer = 0;   /* 成功动画计时器 */
+    this._nameDialogInputArea = null;   /* 输入框区域，用于触摸检测 */
+    this._nameDialogBtnArea = null;     /* 确认按钮区域 */
+
     /* 排行榜返回按钮 */
     this.backBtnArea = {
       startX: 20,
@@ -975,9 +984,195 @@ export default class GameInfo extends Emitter {
     ctx.fillText(`👤 ${label}`, area.startX + 8, (area.startY + area.endY) / 2);
   }
 
-  /* ========== 键盘输入处理 ========== */
+  /* ========== 自定义昵称对话框 ========== */
+
+  /** 弹出自定义昵称对话框 */
   _showNicknameInput() {
-    const current = GameGlobal.nickName || '';
+    this._showNameDialog = true;
+    this._nameDialogText = GameGlobal.nickName || '';
+    this._nameDialogBtnPress = 0;
+    this._nameDialogSuccess = false;
+    this._nameDialogSuccessTimer = 0;
+  }
+
+  /** 关闭昵称对话框并清理状态 */
+  _closeNameDialog() {
+    this._showNameDialog = false;
+    this._nameDialogText = '';
+    this._nameDialogBtnPress = 0;
+    this._nameDialogSuccess = false;
+    this._nameDialogSuccessTimer = 0;
+  }
+
+  /** 渲染自定义昵称对话框 */
+  _renderNameDialog(ctx) {
+    /* 按钮按压动画递减 */
+    if (this._nameDialogBtnPress > 0) {
+      this._nameDialogBtnPress--;
+    }
+
+    const panelW = 300;
+    const panelH = 240;
+    const px = (SCREEN_WIDTH - panelW) / 2;
+    const py = (SCREEN_HEIGHT - panelH) / 2 - 20;
+
+    /* 半透明遮罩 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 面板阴影 */
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = '#1a1a2e';
+    this._roundRect(ctx, px, py, panelW, panelH, 18);
+    ctx.fill();
+    ctx.restore();
+
+    /* 面板边框 */
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1.5;
+    this._roundRect(ctx, px, py, panelW, panelH, 18);
+    ctx.stroke();
+
+    /* 顶部装饰条 */
+    ctx.fillStyle = '#FFD700';
+    this._roundRect(ctx, px + 40, py, panelW - 80, 4, 2);
+    ctx.fill();
+
+    /* 标题 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('设置昵称', SCREEN_WIDTH / 2, py + 32);
+
+    /* 提示文字 */
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.font = '12px Arial';
+    ctx.fillText('输入3-10个字符', SCREEN_WIDTH / 2, py + 55);
+
+    /* 输入框 */
+    const inputX = px + 24;
+    const inputY = py + 75;
+    const inputW = panelW - 48;
+    const inputH = 44;
+    this._nameDialogInputArea = { startX: inputX, startY: inputY, endX: inputX + inputW, endY: inputY + inputH };
+
+    /* 输入框背景 */
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    this._roundRect(ctx, inputX, inputY, inputW, inputH, 10);
+    ctx.fill();
+    ctx.strokeStyle = this._nameDialogText ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1.5;
+    this._roundRect(ctx, inputX, inputY, inputW, inputH, 10);
+    ctx.stroke();
+
+    /* 输入文字 */
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    if (this._nameDialogText) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px Arial';
+      ctx.fillText(this._nameDialogText, inputX + 14, inputY + inputH / 2);
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '14px Arial';
+      ctx.fillText('点击此处输入昵称', inputX + 14, inputY + inputH / 2);
+    }
+
+    /* 光标闪烁（有文字时在末尾显示竖线光标） */
+    if (this._nameDialogText && Math.floor(GameGlobal.databus.frame / 30) % 2 === 0) {
+      const textWidth = ctx.measureText(this._nameDialogText).width || this._nameDialogText.length * 10;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(inputX + 14 + textWidth + 2, inputY + 10, 2, inputH - 20);
+    }
+
+    /* 字符数 */
+    ctx.fillStyle = this._nameDialogText.length >= 3 && this._nameDialogText.length <= 10
+      ? 'rgba(76, 175, 80, 0.7)' : 'rgba(255, 255, 255, 0.35)';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${this._nameDialogText.length}/10`, inputX + inputW - 8, inputY + inputH - 6);
+
+    /* 确认按钮 */
+    const btnY = py + 140;
+    const btnH = 44;
+    this._nameDialogBtnArea = { startX: inputX, startY: btnY, endX: inputX + inputW, endY: btnY + btnH };
+
+    const canConfirm = this._nameDialogText.length >= 3 && this._nameDialogText.length <= 10;
+    const isPressed = this._nameDialogBtnPress > 0;
+
+    /* 按钮按压动画：缩放效果 */
+    const btnScale = isPressed ? 0.95 : 1;
+    const btnCX = inputX + inputW / 2;
+    const btnCY = btnY + btnH / 2;
+
+    ctx.save();
+    ctx.translate(btnCX, btnCY);
+    ctx.scale(btnScale, btnScale);
+
+    ctx.fillStyle = canConfirm ? (isPressed ? '#388E3C' : '#4CAF50') : '#555555';
+    ctx.strokeStyle = canConfirm ? '#2E7D32' : '#333333';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, -inputW / 2, -btnH / 2, inputW, btnH, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    /* 按钮文字 */
+    if (isPressed && canConfirm) {
+      /* 按压时的反馈：文字变暗 + 微缩 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    } else {
+      ctx.fillStyle = canConfirm ? '#ffffff' : 'rgba(255, 255, 255, 0.5)';
+    }
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('确认', 0, 0);
+    ctx.restore();
+
+    /* 关闭按钮（右上角 X） */
+    const closeBtnR = 14;
+    const closeCX = px + panelW - 18;
+    const closeCY = py + 18;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    ctx.arc(closeCX, closeCY, closeBtnR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(closeCX - 5, closeCY - 5);
+    ctx.lineTo(closeCX + 5, closeCY + 5);
+    ctx.moveTo(closeCX + 5, closeCY - 5);
+    ctx.lineTo(closeCX - 5, closeCY + 5);
+    ctx.stroke();
+
+    this._nameDialogCloseArea = { startX: closeCX - closeBtnR, startY: closeCY - closeBtnR,
+      endX: closeCX + closeBtnR, endY: closeCY + closeBtnR };
+
+    /* 成功动画 */
+    if (this._nameDialogSuccess) {
+      this._nameDialogSuccessTimer--;
+      /* 成功勾选动画 */
+      ctx.save();
+      ctx.fillStyle = `rgba(76, 175, 80, ${Math.min(1, (30 - this._nameDialogSuccessTimer) / 15)})`;
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20);
+      ctx.restore();
+
+      if (this._nameDialogSuccessTimer <= 0) {
+        this._closeNameDialog();
+      }
+    }
+  }
+
+  /* ========== 键盘输入处理 ========== */
+  _showKeyboardInput() {
+    const current = this._nameDialogText || '';
     wx.showKeyboard({
       defaultValue: current,
       maxLength: 10,
@@ -990,19 +1185,22 @@ export default class GameInfo extends Emitter {
     if (!res || !res.value) return;
     const name = res.value.trim();
     if (name.length < 3 || name.length > 10) {
-      wx.showToast({ title: '昵称需3-10个字符', icon: 'none' });
+      wx.showToast({ title: '昵称需3-10个字符', icon: 'none', duration: 1500 });
       return;
     }
+    /* 对话框打开时：更新对话框文字 */
+    if (this._showNameDialog) {
+      this._nameDialogText = name;
+      return;
+    }
+    /* 对话框未打开（旧路径兼容）：直接保存 */
     GameGlobal.nickName = name;
     this._cachedNickName = name;
     try {
       wx.setStorageSync(NICKNAME_KEY, name);
     } catch (e) {}
     console.log('[GameInfo] 设置昵称:', name);
-    /* 设置成功后自动开始游戏（如果当前在主页） */
-    if (GameGlobal.screenState === 'home') {
-      this.emit('start');
-    }
+    wx.showToast({ title: `昵称已设为 ${name}`, icon: 'none', duration: 1500 });
   }
 
   _handleKeyboardComplete() {
@@ -1162,6 +1360,49 @@ export default class GameInfo extends Emitter {
     /* 转换到游戏世界坐标 */
     const game = toGameCoord(clientX, clientY);
     if (GameGlobal.DEBUG_LOG) console.log('[Touch] screenState:', GameGlobal.screenState, 'screen:', clientX, clientY, 'game:', game.x.toFixed(1), game.y.toFixed(1));
+
+    /* ===== 自定义昵称对话框：处理内部交互 ===== */
+    if (this._showNameDialog) {
+      /* 关闭按钮 */
+      if (this._nameDialogCloseArea && this._isInArea(game, this._nameDialogCloseArea)) {
+        this._closeNameDialog();
+        return;
+      }
+      /* 输入框：弹出系统键盘 */
+      if (this._nameDialogInputArea && this._isInArea(game, this._nameDialogInputArea)) {
+        this._showKeyboardInput();
+        return;
+      }
+      /* 确认按钮 */
+      if (this._nameDialogBtnArea && this._isInArea(game, this._nameDialogBtnArea)) {
+        const name = this._nameDialogText.trim();
+        if (name.length < 3 || name.length > 10) {
+          wx.showToast({ title: '昵称需3-10个字符', icon: 'none', duration: 1500 });
+          return;
+        }
+        /* 按钮按压反馈 */
+        this._nameDialogBtnPress = 6;  /* 6帧按压动画 */
+        this._nameDialogSuccess = true;
+        this._nameDialogSuccessTimer = 30;
+
+        GameGlobal.nickName = name;
+        this._cachedNickName = name;
+        try {
+          wx.setStorageSync(NICKNAME_KEY, name);
+        } catch (e) {}
+        console.log('[GameInfo] 设置昵称:', name);
+        return;
+      }
+      /* 点击对话框外区域关闭 */
+      const panelW = 300;
+      const panelH = 240;
+      const px = (SCREEN_WIDTH - panelW) / 2;
+      const py = (SCREEN_HEIGHT - panelH) / 2 - 20;
+      if (game.x < px || game.x > px + panelW || game.y < py || game.y > py + panelH) {
+        this._closeNameDialog();
+      }
+      return;
+    }
 
     /* ===== 设置面板：处理内部交互 ===== */
     if (GameGlobal.screenState === 'settings') {

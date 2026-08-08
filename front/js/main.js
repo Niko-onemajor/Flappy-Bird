@@ -91,6 +91,10 @@ export default class Main {
   _lastMilestone = 0;        /* 上次触发的分数里程碑 */
   _cachedDifficulty = null;  /* 难度参数缓存，分数变化时刷新 */
 
+  /* 帧率控制：限制 60fps，确保高刷屏(120Hz+)游戏速度一致 */
+  _lastFrameTime = 0;
+  _frameInterval = 1000 / 60;  /* ≈16.67ms */
+
   constructor() {
     this.player = new Player();
     this.databus.player = this.player;  /* 绑定到全局，供Rocket等组件访问 */
@@ -753,6 +757,14 @@ export default class Main {
       ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
+
+    /* 4. 自定义昵称对话框（渲染在最顶层，屏幕坐标系） */
+    if (this.gameInfo._showNameDialog) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.gameInfo._renderNameDialog(ctx);
+      ctx.restore();
+    }
   }
 
   /** 渲染所有游戏实体：水管、道具、锯片、火箭、玩家 */
@@ -766,16 +778,24 @@ export default class Main {
 
   /* 主循环 */
   loop() {
-    this.bg.update();
+    /* 60fps 帧率限制：确保高刷屏(120Hz+)上游戏速度一致 */
+    const now = performance.now();
+    const elapsed = now - this._lastFrameTime;
+    if (elapsed >= this._frameInterval) {
+      /* 对齐到帧间隔边界，防止累积漂移 */
+      this._lastFrameTime = now - (elapsed % this._frameInterval);
 
-    if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
-      this.tick();
-      this.render();
-    } else {
-      /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 30fps，减少 CPU/GPU 开销 */
-      this._staticFrameCount++;
-      if (this._staticFrameCount % 2 === 0) {
+      this.bg.update();
+
+      if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
+        this.tick();
         this.render();
+      } else {
+        /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 30fps，减少 CPU/GPU 开销 */
+        this._staticFrameCount++;
+        if (this._staticFrameCount % 2 === 0) {
+          this.render();
+        }
       }
     }
 
