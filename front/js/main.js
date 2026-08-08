@@ -153,6 +153,11 @@ export default class Main {
     GameGlobal.sound.stopAll();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
+
+    /* 回到主页时尝试获取微信昵称 */
+    if (!GameGlobal.nickName && typeof GameGlobal.fetchWxNickName === 'function') {
+      GameGlobal.fetchWxNickName();
+    }
   }
 
   startGame() {
@@ -166,6 +171,11 @@ export default class Main {
     this._pipesSinceLastProp = 0;
     this._scoreSubmitted = false;
     this._scoreSubmitting = false;
+
+    /* 在用户交互后尝试获取微信昵称（提升成功率） */
+    if (!GameGlobal.nickName && typeof GameGlobal.fetchWxNickName === 'function') {
+      GameGlobal.fetchWxNickName();
+    }
     this._scoreRetryTimer = 0;
     this._deathTimer = -1;
     this._deathFadeAlpha = 0;
