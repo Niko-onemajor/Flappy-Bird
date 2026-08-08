@@ -64,7 +64,11 @@ export default class Sound {
       if (!audio) return;
       const cfg = AUDIO_CONFIG[key];
       if (cfg) {
-        audio.volume = this._calcVolume(key, cfg.volume);
+        let vol = this._calcVolume(key, cfg.volume);
+        if (key === 'fuseBurn' && this._fuseBurnDynamicVol !== undefined) {
+          vol *= this._fuseBurnDynamicVol;
+        }
+        audio.volume = vol;
       }
     });
   }
@@ -123,12 +127,24 @@ export default class Sound {
   playFuseBurn() {
     if (this._fuseBurnPlaying) return;
     this._fuseBurnPlaying = true;
+    this._fuseBurnDynamicVol = 0.2;  /* 初始低音量 */
     const a = this._getAudio('fuseBurn');
     a.seek(0);
     a.onEnded(() => {
       this._fuseBurnPlaying = false;
+      this._fuseBurnDynamicVol = 1.0;
     });
     a.play();
+  }
+
+  /** 动态调整引信音量（追踪阶段从 0.2 渐增至 1.0） */
+  setFuseBurnVolume(vol) {
+    this._fuseBurnDynamicVol = Math.max(0.05, Math.min(1, vol));
+    const a = this._cache.fuseBurn;
+    if (a) {
+      const cfg = AUDIO_CONFIG.fuseBurn;
+      a.volume = cfg.volume * this.masterVolume * this.sfxVolume * this._fuseBurnDynamicVol;
+    }
   }
 
   /* 火箭飞行音效：只播一次，不重叠 */

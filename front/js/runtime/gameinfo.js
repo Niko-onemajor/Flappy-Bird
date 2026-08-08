@@ -52,6 +52,7 @@ export default class GameInfo extends Emitter {
 
     /* 排行榜数据 */
     this._leaderboardData = null;
+    this._leaderboardLoading = false;  /* 排行榜是否正在加载 */
     this._leaderboardScrollY = 0;    /* 排行榜滚动偏移 */
     this._leaderboardMaxScroll = 0;  /* 排行榜最大滚动量 */
     this._touchStartY = null;        /* 触摸起始Y坐标 */
@@ -307,7 +308,13 @@ export default class GameInfo extends Emitter {
     ctx.fillText('← 返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
 
     const data = this._leaderboardData;
-    if (!data || data.length === 0) {
+    if (this._leaderboardLoading) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      const dots = '.'.repeat(Math.floor(GameGlobal.databus.frame / 30) % 4);
+      ctx.fillText(`加载中${dots}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+    } else if (!data || data.length === 0) {
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '16px Arial';
       ctx.fillText('暂无数据', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
@@ -527,12 +534,43 @@ export default class GameInfo extends Emitter {
     const goH = 42;
     ctx.drawImage(this.gameoverImg, SCREEN_WIDTH / 2 - goW / 2, SCREEN_HEIGHT / 2 - 90, goW, goH);
 
+    /* 最高分 */
+    const best = this._getBestScore();
+    const isNewRecord = score >= best && score > 0;
+
+    /* 新纪录：分数周围绘制金色闪烁光晕 */
+    if (isNewRecord) {
+      const pulse = 0.4 + 0.4 * Math.sin(GameGlobal.databus.frame * 0.1);
+      const digits = String(score).length;
+      const glowW = Math.max(digits * 24 + 30, 100);
+      const glowH = 50;
+      const gx = SCREEN_WIDTH / 2 - glowW / 2;
+      const gy = SCREEN_HEIGHT / 2 - 30 - glowH / 2;
+
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 20 * (1 + Math.sin(GameGlobal.databus.frame * 0.08));
+      ctx.fillStyle = `rgba(255, 215, 0, ${pulse * 0.2})`;
+      this._roundRect(ctx, gx, gy, glowW, glowH, 8);
+      ctx.fill();
+      ctx.restore();
+
+      /* 外发光边框 */
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+      ctx.lineWidth = 2;
+      this._roundRect(ctx, gx, gy, glowW, glowH, 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     /* 分数 */
     this._drawScore(ctx, score, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30);
 
     /* 最高分 */
-    const best = this._getBestScore();
-    if (score >= best && score > 0) {
+    if (isNewRecord) {
       if (!this._bestScoreSaved) {
         this._saveBestScore(score);
         this._bestScoreSaved = true;
@@ -606,8 +644,15 @@ export default class GameInfo extends Emitter {
 
   /* ========== 暂停面板 ========== */
   renderPauseOverlay(ctx) {
-    /* 半透明遮罩 */
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    /* 渐暗遮罩 + 径向暗角，营造聚焦效果 */
+    const vignette = ctx.createRadialGradient(
+      SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 80,
+      SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH * 0.7
+    );
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+    vignette.addColorStop(0.5, 'rgba(0, 0, 0, 0.6)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+    ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     /* 二次确认弹窗 */

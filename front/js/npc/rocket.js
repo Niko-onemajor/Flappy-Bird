@@ -5,6 +5,7 @@ import { GROUND, ROCKET as ROCKET_CFG } from '../config';
 const ROCKET_W = ROCKET_CFG.WIDTH;
 const ROCKET_H = ROCKET_CFG.HEIGHT;
 const TRACK_DURATION = 120;  /* 追踪阶段：120帧 = 2秒 */
+const MAX_PARTICLES = 30;    /* 尾气粒子池大小 */
 
 /* 预加载火箭图片（带错误检测） */
 const ROCKET_IMG = (() => {
@@ -25,7 +26,8 @@ export default class Rocket extends Sprite {
   trackTimer = 0;        /* 追踪剩余帧数 */
   _trackedX = 0;         /* 追踪到的玩家X */
   _trackedY = 0;         /* 追踪到的玩家Y */
-  exhaust = [];          /* 尾气粒子数组 */
+  exhaust = [];          /* 尾气粒子对象池（固定大小，用 active 标记复用） */
+  _particlePoolReady = false;
 
   constructor() {
     super('', ROCKET_W, ROCKET_H);
@@ -37,9 +39,14 @@ export default class Rocket extends Sprite {
     this.isActive = true;
     this.speed = pipeSpeed * 1.2;
     this.trailPhase = 0;
-    this.exhaust = [];
     this.state = 'tracking';
     this.trackTimer = TRACK_DURATION;
+
+    /* 初始化粒子池（仅首次创建时分配对象，后续复用） */
+    if (!this._particlePoolReady) {
+      this._initParticlePool();
+    }
+    this._resetParticlePool();
 
     /* 从屏幕右侧进入，追踪阶段可见 */
     this.x = SCREEN_WIDTH + 30 + Math.random() * 50;
@@ -67,6 +74,13 @@ export default class Rocket extends Sprite {
       this.x -= this.speed * 0.3;  /* 缓慢进入屏幕 */
       this.trackTimer--;
       this.trailPhase += 0.05;
+
+      /* 追踪阶段音效渐变：从 0.2 渐增至 1.0，营造紧迫感 */
+      if (GameGlobal.sound && this.trackTimer > 0) {
+        const progress = 1 - this.trackTimer / TRACK_DURATION;  /* 0.0 → 1.0 */
+        const vol = 0.2 + progress * 0.8;
+        GameGlobal.sound.setFuseBurnVolume(vol);
+      }
 
       /* 持续更新追踪到的玩家位置 */
       const player = GameGlobal.databus.player;
@@ -98,34 +112,71 @@ export default class Rocket extends Sprite {
     this.y += Math.sin(this.angle) * this.speed;
     this.trailPhase += 0.15;
 
-    /* 生成新尾气粒子（上限30个防止性能问题） */
-    if (this.exhaust.length < 30 && (this.state === 'flying' || (this.state === 'tracking' && this.trackTimer < 60))) {
-      const cx = this.x + this.width / 2;
-      const cy = this.y + this.height / 2;
-      /* 火箭尾部反方向生成粒子 */
-      const backOffsetX = -Math.cos(this.angle) * (this.height / 2 + 2);
-      const backOffsetY = -Math.sin(this.angle) * (this.height / 2 + 2);
-      const particle = {
-        x: cx + backOffsetX + (Math.random() - 0.5) * 4,
-        y: cy + backOffsetY + (Math.random() - 0.5) * 4,
-        size: 2 + Math.random() * 6,
-        alpha: 0.7 + Math.random() * 0.3,
-        life: 30 + Math.floor(Math.random() * 20),
-        vx: -Math.cos(this.angle) * (1 + Math.random() * 2),
-        vy: -Math.sin(this.angle) * (1 + Math.random() * 2),
-      };
-      this.exhaust.push(particle);
-    }
+    /* 生成新尾气粒子（从对象池获取，避免 new 开销） */
+    this._spawnExhaust();
 
-    /* 更新已有粒子寿命 */
-    for (let i = this.exhaust.length - 1; i >= 0; i--) {
+    /* 更新已有粒子寿命（使用 active 标记，避免 splice 开销） */
+    this._updateExhaust();
+  }
+
+  /* ========== 尾气粒子对象池 ========== */
+
+  /** 预分配粒子对象池（仅调用一次，后续复用） */
+  _initParticlePool() {
+    this.exhaust = [];
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      this.exhaust.push({ x: 0, y: 0, size: 0, alpha: 0, life: 0, vx: 0, vy: 0, active: false });
+    }
+    this._particlePoolReady = true;
+  }
+
+  /** 重置粒子池状态（保留对象，仅重置 active） */
+  _resetParticlePool() {
+    for (let i = 0; i < this.exhaust.length; i++) {
+      this.exhaust[i].active = false;
+    }
+  }
+
+  /** 从对象池中获取一个空闲粒子槽 */
+  _getParticleSlot() {
+    for (let i = 0; i < this.exhaust.length; i++) {
+      if (!this.exhaust[i].active) return this.exhaust[i];
+    }
+    return null;
+  }
+
+  /** 生成一个尾气粒子（从对象池复用） */
+  _spawnExhaust() {
+    if (this.state !== 'flying' && !(this.state === 'tracking' && this.trackTimer < 60)) return;
+
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    const backOffsetX = -Math.cos(this.angle) * (this.height / 2 + 2);
+    const backOffsetY = -Math.sin(this.angle) * (this.height / 2 + 2);
+
+    const p = this._getParticleSlot();
+    if (!p) return;
+    p.active = true;
+    p.x = cx + backOffsetX + (Math.random() - 0.5) * 4;
+    p.y = cy + backOffsetY + (Math.random() - 0.5) * 4;
+    p.size = 2 + Math.random() * 6;
+    p.alpha = 0.7 + Math.random() * 0.3;
+    p.life = 30 + Math.floor(Math.random() * 20);
+    p.vx = -Math.cos(this.angle) * (1 + Math.random() * 2);
+    p.vy = -Math.sin(this.angle) * (1 + Math.random() * 2);
+  }
+
+  /** 更新所有粒子寿命（仅置 active=false，不删除对象） */
+  _updateExhaust() {
+    for (let i = 0; i < this.exhaust.length; i++) {
       const p = this.exhaust[i];
+      if (!p.active) continue;
       p.life--;
       p.x += p.vx;
       p.y += p.vy;
       p.alpha *= 0.92;
       if (p.life <= 0 || p.alpha < 0.05) {
-        this.exhaust.splice(i, 1);
+        p.active = false;
       }
     }
   }
@@ -139,7 +190,7 @@ export default class Rocket extends Sprite {
     /* 绘制尾气粒子（世界坐标系）- 使用纯色替代渐变，大幅减少 createRadialGradient 调用 */
     ctx.save();
     for (const p of this.exhaust) {
-      if (p.alpha < 0.05) continue;
+      if (!p.active || p.alpha < 0.05) continue;
       const a = p.alpha * 0.6;
       /* 外焰（橙色） */
       ctx.fillStyle = `rgba(255, 140, 40, ${a})`;
@@ -246,7 +297,7 @@ export default class Rocket extends Sprite {
 
   /** 对象池回收时清理残留状态 */
   reset() {
-    this.exhaust = [];
+    this._resetParticlePool();
     this._flameGrad = null;
     this._lastFlameLen = 0;
     this.angle = 0;

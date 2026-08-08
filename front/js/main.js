@@ -84,6 +84,7 @@ export default class Main {
   _prevScreenState = null;
   _shakeTimer = 0;          /* 屏幕抖动剩余帧数 */
   _shakeIntensity = 0;      /* 屏幕抖动强度 */
+  _staticFrameCount = 0;    /* 静态状态帧计数器，用于降帧 */
 
   constructor() {
     this.player = new Player();
@@ -201,12 +202,15 @@ export default class Main {
     this.screenState = SCREEN_STATE.LEADERBOARD;
     GameGlobal.screenState = SCREEN_STATE.LEADERBOARD;
     this.gameInfo._leaderboardScrollY = 0;
+    this.gameInfo._leaderboardLoading = true;
+    this.gameInfo._leaderboardData = null;
     try {
       const data = await getTopScores(10);
       this.gameInfo._leaderboardData = data;
     } catch (err) {
       console.error('[Main] 获取排行榜失败:', err);
     }
+    this.gameInfo._leaderboardLoading = false;
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
   }
@@ -580,6 +584,10 @@ export default class Main {
       this.player.destroy();
       this.databus.gameOver();
       GameGlobal.sound.playDie();
+      /* 游戏结束时加强振动反馈 */
+      if (GameGlobal.settings && GameGlobal.settings.vibrate && typeof wx.vibrateShort === 'function') {
+        wx.vibrateShort({ type: 'heavy' });
+      }
     } else {
       this.databus.invincibleTimer = PLAYER.INVINCIBLE_DURATION;
     }
@@ -649,9 +657,14 @@ export default class Main {
 
     if (this.screenState === SCREEN_STATE.PLAYING || this.screenState === SCREEN_STATE.COUNTDOWN) {
       this.tick();
+      this.render();
+    } else {
+      /* 静态状态（HOME/SETTINGS/LEADERBOARD/PAUSED）：降帧到约 20fps，减少 CPU/GPU 开销 */
+      this._staticFrameCount++;
+      if (this._staticFrameCount % 3 === 0) {
+        this.render();
+      }
     }
-
-    this.render();
 
     this.aniId = requestAnimationFrame(this._boundLoop);
   }
