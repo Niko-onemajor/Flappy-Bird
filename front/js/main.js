@@ -259,8 +259,6 @@ export default class Main {
 
   async submitScoreToServer() {
     if (this.databus.score <= 0) { this._scoreSubmitted = true; return; }
-    /* 最低分数阈值：低于 10 分不提交，防止测试用户的低分污染排行榜 */
-    if (this.databus.score < 10) { this._scoreSubmitted = true; console.log('[Main] 分数过低，不提交（<10）'); return; }
     this._scoreRetryCount = 0;
     try {
       await submitScore('Player', this.databus.score);
@@ -277,8 +275,6 @@ export default class Main {
   /** 分数提交重试（每帧调用，由 game over 块触发） */
   _retryScoreSubmission() {
     if (this._scoreSubmitted) return;
-    /* 分数过低或已≤0，不再重试 */
-    if (this.databus.score < 10) { this._scoreSubmitted = true; return; }
     if (this._scoreRetryTimer <= 0) return;
     this._scoreRetryTimer--;
     if (this._scoreRetryTimer > 0) return;
