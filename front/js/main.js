@@ -151,7 +151,6 @@ export default class Main {
     this._deathFadeAlpha = 0;
     this._deathFlashTimer = 0;
     GameGlobal.sound.stopAll();
-    this.gameInfo.resetBestScore();
     cancelAnimationFrame(this.aniId);
     this.aniId = requestAnimationFrame(this._boundLoop);
   }

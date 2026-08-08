@@ -1353,14 +1353,6 @@ export default class GameInfo extends Emitter {
     ctx.closePath();
   }
 
-  /** 重置本地最高分（清除缓存 + 本地存储） */
-  resetBestScore() {
-    this._cachedBestScore = null;
-    try {
-      wx.setStorageSync('flappy_best', 0);
-    } catch (e) { /* 忽略 */ }
-  }
-
   _getBestScore() {
     if (this._cachedBestScore === null) {
       try {
