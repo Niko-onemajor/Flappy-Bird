@@ -10,7 +10,7 @@ import Prop from './npc/prop';
 import Saw from './npc/saw';
 import Rocket from './npc/rocket';
 import DataBus from './databus';
-import { PLAYER, PIPE, SAW as SAW_CFG, ROCKET as ROCKET_CFG } from './config';
+import { PLAYER, PIPE, SAW as SAW_CFG, ROCKET as ROCKET_CFG, PROP } from './config';
 
 const ctx = canvas.getContext('2d');
 
@@ -82,7 +82,6 @@ export default class Main {
   _deathTimer = -1;          /* 死亡动画计时器（-1=未激活） */
   _deathFadeAlpha = 0;       /* 死亡画面渐暗透明度 */
   _deathFlashTimer = 0;      /* 死亡闪白计时器 */
-  _prevScore = 0;
   _countdownTimer = 0;
   _countdownStart = 0;
   _prevScreenState = null;
@@ -161,7 +160,8 @@ export default class Main {
     this._deathTimer = -1;
     this._deathFadeAlpha = 0;
     this._deathFlashTimer = 0;
-    this._prevScore = 0;
+    this._lastMilestone = 0;
+    this.gameInfo._milestoneEffectTimer = 0;
     GameGlobal.isGameOverServer = false;
     this.screenState = SCREEN_STATE.READY;
     GameGlobal.screenState = SCREEN_STATE.READY;
@@ -347,17 +347,14 @@ export default class Main {
         this.databus.score += this.databus.scoreMultiplier;
         GameGlobal.sound.playPoint();
 
-        /* 分数里程碑提示：每10分播放提升音效 */
+        /* 分数里程碑提示：每10分播放提升音效 + 分数视觉特效 */
         const s = this.databus.score;
         const milestone = Math.floor(s / 10) * 10;
         if (milestone >= 10 && milestone > this._lastMilestone) {
           this._lastMilestone = milestone;
           GameGlobal.sound.playSwoosh();
-          /* 屏幕抖动作视觉反馈 */
-          if (GameGlobal.settings && GameGlobal.settings.screenShake) {
-            this._shakeTimer = Math.max(this._shakeTimer, 4);
-            this._shakeIntensity = Math.max(this._shakeIntensity, 4);
-          }
+          /* 触发分数视觉特效（金色放大+弹跳），替代屏幕抖动避免影响手感 */
+          this.gameInfo._milestoneEffectTimer = 25;
         }
       }
     }
@@ -499,7 +496,7 @@ export default class Main {
       const prop = this.databus.props[i];
       if (prop.collected) continue;
       prop.x -= prop.speed;
-      prop.animPhase += 0.06;  /* PROP.FLOAT_SPEED，保持漂浮动画活跃 */
+      prop.animPhase += PROP.FLOAT_SPEED;  /* 保持漂浮动画活跃 */
 
       /* 跟随移动水管同步更新Y坐标 */
       prop.syncYWithMovingPipe();

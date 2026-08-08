@@ -66,6 +66,7 @@ export default class GameInfo extends Emitter {
     this._cachedBestScore = null;     /* 最佳成绩缓存，避免每帧读存储 */
     this._showQuitConfirm = false;   /* 结束游戏二次确认弹窗 */
     this._draggingSlider = null;     /* 当前正在拖拽的滑动条 */
+    this._milestoneEffectTimer = 0;  /* 分数里程碑特效计时器（帧数） */
 
     /* 暂停按钮（左上角，正方形36×36） */
     this.pauseBtnArea = {
@@ -460,8 +461,13 @@ export default class GameInfo extends Emitter {
       this._cachedBestScore = null;
     }
 
-    /* 使用数字图片显示分数 */
-    this._drawScore(ctx, databus.score, SCREEN_WIDTH / 2, 40);
+    /* 里程碑特效计时器递减 */
+    if (this._milestoneEffectTimer > 0) {
+      this._milestoneEffectTimer--;
+    }
+
+    /* 使用数字图片显示分数（带里程碑特效） */
+    this._drawScore(ctx, databus.score, SCREEN_WIDTH / 2, 40, 4, this._milestoneEffectTimer);
 
     /* 道具状态栏 */
     this.renderPropBar(ctx, databus);
@@ -478,8 +484,10 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* 用数字图片绘制分数 */
-  _drawScore(ctx, score, cx, cy, gap = 4) {
+  /* 用数字图片绘制分数（支持里程碑视觉特效）
+   * effectTimer > 0 时触发特效：金色辉光面板 + 弹性放大 + Y轴弹跳
+   * effectTimer > 100 时视为持久模式（游戏结束卡片），使用呼吸动画替代单次衰减 */
+  _drawScore(ctx, score, cx, cy, gap = 4, effectTimer = 0) {
     const digits = String(score).split('');
     const numW = 24;
     const numH = 36;
@@ -487,9 +495,56 @@ export default class GameInfo extends Emitter {
     const totalW = digits.length * step - gap;
     const startX = cx - totalW / 2;
 
+    const hasEffect = effectTimer > 0;
+    let scale = 1;
+    let extraY = 0;
+    let glowAlpha = 0;
+
+    if (hasEffect) {
+      const isPersistent = effectTimer > 100;
+      const progress = isPersistent
+        ? 0.5 + 0.5 * Math.sin(GameGlobal.databus.frame * 0.08)  /* 持久呼吸效果 */
+        : effectTimer / 25;                                        /* 1.0 → 0.0 衰减 */
+      scale = 1 + 0.35 * progress;         /* 1.35 → 1.0 放大 */
+      extraY = isPersistent ? 0 : Math.sin(effectTimer * 0.6) * 2.5;  /* 仅衰减模式弹跳 */
+      glowAlpha = 0.6 * progress;          /* 辉光强度 */
+    }
+
+    /* 金色辉光背景面板（替代昂贵的 shadowBlur，避免移动端掉帧） */
+    if (hasEffect && glowAlpha > 0.01) {
+      ctx.save();
+      const padX = 12;
+      const padY = 10;
+      const panelX = startX - padX;
+      const panelY = cy - numH / 2 - padY;
+      const panelW = totalW + padX * 2;
+      const panelH = numH + padY * 2;
+
+      /* 辉光填充 */
+      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha * 0.15})`;
+      this._roundRect(ctx, panelX, panelY, panelW, panelH, 10);
+      ctx.fill();
+
+      /* 金色边框 */
+      ctx.strokeStyle = `rgba(255, 215, 0, ${glowAlpha * 0.35})`;
+      ctx.lineWidth = 1.5;
+      this._roundRect(ctx, panelX, panelY, panelW, panelH, 10);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     for (let i = 0; i < digits.length; i++) {
       const d = parseInt(digits[i]);
-      if (this.numImgs[d]) {
+      if (!this.numImgs[d]) continue;
+
+      if (hasEffect) {
+        ctx.save();
+        const digitCx = startX + i * step + numW / 2;
+        ctx.translate(digitCx, cy + extraY);
+        ctx.scale(scale, scale);
+        ctx.drawImage(this.numImgs[d], -numW / 2, -numH / 2, numW, numH);
+        ctx.restore();
+      } else {
         ctx.drawImage(this.numImgs[d], startX + i * step, cy - numH / 2, numW, numH);
       }
     }
@@ -571,8 +626,9 @@ export default class GameInfo extends Emitter {
     ctx.textBaseline = 'middle';
     ctx.fillText('得分', SCREEN_WIDTH / 2, cardY + 16);
 
-    /* 分数（居中于卡片内） */
-    this._drawScore(ctx, score, SCREEN_WIDTH / 2, cardY + 46);
+    /* 分数（居中于卡片内）— 若是里程碑分数，显示持久金色辉光特效 */
+    const isMilestoneScore = score >= 10 && score % 10 === 0;
+    this._drawScore(ctx, score, SCREEN_WIDTH / 2, cardY + 46, 4, isMilestoneScore ? 999 : 0);
 
     /* 新纪录或最高分 */
     if (isNewRecord) {
