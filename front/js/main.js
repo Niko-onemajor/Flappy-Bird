@@ -89,6 +89,7 @@ export default class Main {
   _shakeIntensity = 0;      /* 屏幕抖动强度 */
   _staticFrameCount = 0;    /* 静态状态帧计数器，用于降帧 */
   _lastMilestone = 0;        /* 上次触发的分数里程碑 */
+  _cachedDifficulty = null;  /* 难度参数缓存，分数变化时刷新 */
 
   constructor() {
     this.player = new Player();
@@ -119,15 +120,23 @@ export default class Main {
     this.loop();
   }
 
-  /* ========== 难度计算 ========== */
+  /* ========== 难度计算（缓存结果，分数不变时避免重复计算） ========== */
   _getDifficulty() {
-    const level = this.databus.score / DIFFICULTY_STEP;
-    return {
-      speed: Math.min(SPEED_BASE + level * SPEED_INCREMENT, SPEED_MAX),
-      gap: Math.max(GAP_BASE - level * GAP_DECREMENT, GAP_MIN),
-      interval: Math.max(INTERVAL_BASE - level * INTERVAL_DECREMENT, INTERVAL_MIN),
-      propChance: Math.min(PROP_CHANCE_BASE + level * PROP_CHANCE_INCREMENT, 0.65),
+    const score = this.databus.score;
+    if (this._cachedDifficulty && this._cachedDifficulty.score === score) {
+      return this._cachedDifficulty.data;
+    }
+    const level = score / DIFFICULTY_STEP;
+    this._cachedDifficulty = {
+      score,
+      data: {
+        speed: Math.min(SPEED_BASE + level * SPEED_INCREMENT, SPEED_MAX),
+        gap: Math.max(GAP_BASE - level * GAP_DECREMENT, GAP_MIN),
+        interval: Math.max(INTERVAL_BASE - level * INTERVAL_DECREMENT, INTERVAL_MIN),
+        propChance: Math.min(PROP_CHANCE_BASE + level * PROP_CHANCE_INCREMENT, 0.65),
+      },
     };
+    return this._cachedDifficulty.data;
   }
 
   /* ========== 屏幕状态切换 ========== */
@@ -148,6 +157,7 @@ export default class Main {
 
   startGame() {
     this.databus.reset();
+    this._staticFrameCount = 0;  /* 重置静态帧计数器 */
     this.player.init();
     this.pipeTimer = 0;
     this.propTimer = 0;
@@ -377,11 +387,12 @@ export default class Main {
     this.pipeTimer--;
     if (this.pipeTimer > 0) return;
 
-    /* 间距检查：若上一根水管离屏幕右边缘太近，延后生成 */
+    /* 间距检查：若上一根水管离屏幕右边缘太近，计算需要等待的精确帧数，避免忙碌等待 */
     if (this.databus.pipes.length > 0) {
       const last = this.databus.pipes[this.databus.pipes.length - 1];
       if (last.x > SCREEN_WIDTH - MIN_SPACING) {
-        this.pipeTimer = 1;  /* 重置，防止连续递减到负数 */
+        const dist = last.x - (SCREEN_WIDTH - MIN_SPACING);
+        this.pipeTimer = Math.max(1, Math.ceil(dist / speed));
         return;
       }
     }
@@ -587,15 +598,16 @@ export default class Main {
     }
   }
 
-  /** 护盾抵挡碰撞：消耗护盾并移除障碍物，返回 true 表示护盾生效 */
+  /** 护盾抵挡碰撞：消耗护盾并移除障碍物，返回 true 表示护盾生效
+   *  使用 instanceof 替代 includes 判断，避免实体已被回收导致的二次调用风险 */
   _tryConsumeShield(entity) {
     if (!this.databus.shieldActive) return false;
 
-    if (this.databus.pipes.includes(entity)) {
+    if (entity instanceof Pipe) {
       this.databus.removePipe(entity);
-    } else if (this.databus.saws.includes(entity)) {
+    } else if (entity instanceof Saw) {
       this.databus.removeSaw(entity);
-    } else if (this.databus.rockets.includes(entity)) {
+    } else if (entity instanceof Rocket) {
       this.databus.removeRocket(entity);
     }
     this.databus.shieldActive = false;
