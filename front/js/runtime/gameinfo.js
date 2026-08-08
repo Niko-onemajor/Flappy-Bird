@@ -167,6 +167,8 @@ export default class GameInfo extends Emitter {
     wx.onTouchEnd(this._touchEndHandler);
 
     /* 键盘输入事件监听 */
+    this._onKeyboardInput = this._handleKeyboardInput.bind(this);
+    wx.onKeyboardInput(this._onKeyboardInput);
     this._onKeyboardConfirm = this._handleKeyboardConfirm.bind(this);
     wx.onKeyboardConfirm(this._onKeyboardConfirm);
     this._onKeyboardComplete = this._handleKeyboardComplete.bind(this);
@@ -1014,6 +1016,8 @@ export default class GameInfo extends Emitter {
     this._nameDialogBtnPress = 0;
     this._nameDialogSuccess = false;
     this._nameDialogSuccessTimer = 0;
+    /* 收起键盘（如果还开着） */
+    wx.hideKeyboard({});
   }
 
   /** 渲染自定义昵称对话框 */
@@ -1190,22 +1194,50 @@ export default class GameInfo extends Emitter {
       maxLength: 10,
       multiple: false,
       confirmType: 'done',
+      success: () => {
+        console.log('[GameInfo] 键盘弹出成功');
+      },
+      fail: (err) => {
+        console.error('[GameInfo] 键盘弹出失败:', err);
+        wx.showToast({ title: '键盘弹出失败，请重试', icon: 'none', duration: 2000 });
+      },
     });
+  }
+
+  /** 实时输入：每次按键都更新对话框文字 */
+  _handleKeyboardInput(res) {
+    if (!res || !res.value) return;
+    if (this._showNameDialog) {
+      this._nameDialogText = res.value;
+    }
   }
 
   _handleKeyboardConfirm(res) {
     if (!res || !res.value) return;
     const name = res.value.trim();
-    if (name.length < 3 || name.length > 10) {
-      wx.showToast({ title: '昵称需3-10个字符', icon: 'none', duration: 1500 });
-      return;
-    }
     /* 对话框打开时：更新对话框文字 */
     if (this._showNameDialog) {
       this._nameDialogText = name;
+      /* 不自动关闭键盘，让用户手动点击确认按钮保存 */
       return;
     }
     /* 对话框未打开（旧路径兼容）：直接保存 */
+    this._saveNickname(name);
+  }
+
+  _handleKeyboardComplete(res) {
+    /* 键盘被收起（折叠/切换应用/点击完成）：保存当前输入值 */
+    if (this._showNameDialog && res && res.value) {
+      this._nameDialogText = res.value.trim();
+    }
+  }
+
+  /** 保存昵称到本地存储和 GameGlobal */
+  _saveNickname(name) {
+    if (!name || name.length < 3 || name.length > 10) {
+      wx.showToast({ title: '昵称需3-10个字符', icon: 'none', duration: 1500 });
+      return false;
+    }
     GameGlobal.nickName = name;
     this._cachedNickName = name;
     try {
@@ -1213,10 +1245,7 @@ export default class GameInfo extends Emitter {
     } catch (e) {}
     console.log('[GameInfo] 设置昵称:', name);
     wx.showToast({ title: `昵称已设为 ${name}`, icon: 'none', duration: 1500 });
-  }
-
-  _handleKeyboardComplete() {
-    /* 键盘关闭时无需额外处理 */
+    return true;
   }
 
   /* ========== 设置面板渲染 ========== */
@@ -1388,21 +1417,12 @@ export default class GameInfo extends Emitter {
       /* 确认按钮 */
       if (this._nameDialogBtnArea && this._isInArea(game, this._nameDialogBtnArea)) {
         const name = this._nameDialogText.trim();
-        if (name.length < 3 || name.length > 10) {
-          wx.showToast({ title: '昵称需3-10个字符', icon: 'none', duration: 1500 });
-          return;
-        }
-        /* 按钮按压反馈 */
+        if (!this._saveNickname(name)) return;
+        /* 保存成功后：收起键盘 + 按压反馈动画 */
+        wx.hideKeyboard({});
         this._nameDialogBtnPress = 6;  /* 6帧按压动画 */
         this._nameDialogSuccess = true;
         this._nameDialogSuccessTimer = 30;
-
-        GameGlobal.nickName = name;
-        this._cachedNickName = name;
-        try {
-          wx.setStorageSync(NICKNAME_KEY, name);
-        } catch (e) {}
-        console.log('[GameInfo] 设置昵称:', name);
         return;
       }
       /* 点击对话框外区域关闭 */
