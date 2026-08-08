@@ -320,6 +320,7 @@ export default class GameInfo extends Emitter {
       ctx.textAlign = 'center';
       const dots = '.'.repeat(Math.floor(GameGlobal.databus.frame / 30) % 4);
       ctx.fillText(`加载中${dots}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+      return;
     } else if (!data || data.length === 0) {
       ctx.fillStyle = '#aaaaaa';
       ctx.font = '16px Arial';
@@ -997,12 +998,12 @@ export default class GameInfo extends Emitter {
       ctx.textAlign = 'right';
       ctx.fillText(Math.round(value * 100) + '%', px + pw - 20, sy);
 
-      /* 存储滑块区域用于触摸检测 */
+      /* 存储滑块区域用于触摸检测 — 增大触摸区域方便手指操作 */
       this._sliderAreas[key]._area = {
-        startX: sliderLeft,
-        startY: sy + 16 - 6,
-        endX: sliderLeft + sliderW,
-        endY: sy + 16 + 6 + 6,
+        startX: sliderLeft - 8,
+        startY: sy + 16 - 20,
+        endX: sliderLeft + sliderW + 8,
+        endY: sy + 16 + 20,
       };
 
       sliderIdx++;

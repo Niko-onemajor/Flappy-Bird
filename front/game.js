@@ -3,10 +3,33 @@ import Main from './js/main';
 /* 记录启动开始时间（import 完成后尽快执行） */
 const _startTime = Date.now();
 
-/* 开启调试模式，真机调试时可在 vConsole 中查看日志 */
-if (typeof wx.setEnableDebug === 'function') {
-  wx.setEnableDebug({ enableDebug: true });
+/**
+ * 获取微信用户昵称（封装为 Promise，可重复调用）
+ * @returns {Promise<string|null>} 昵称或 null
+ */
+function fetchWxNickName() {
+  return new Promise((resolve) => {
+    wx.getUserInfo({
+      withCredentials: false,
+      success: (res) => {
+        const name = res.userInfo.nickName;
+        GameGlobal.nickName = name;
+        console.log('[Game] 获取用户昵称成功:', name);
+        resolve(name);
+      },
+      fail: (err) => {
+        console.warn('[Game] 获取用户昵称失败:', err);
+        resolve(null);
+      },
+    });
+  });
 }
+
+/* 立即尝试获取（游戏启动时尽早获取） */
+fetchWxNickName();
+
+/* 挂载到 GameGlobal，供其他模块在需要时重试 */
+GameGlobal.fetchWxNickName = fetchWxNickName;
 
 /* 开启高性能模式：iOS 设备获得更好的渲染性能 */
 if (typeof wx.setPreferredFramesPerSecond === 'function') {

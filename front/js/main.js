@@ -225,7 +225,7 @@ export default class Main {
     this.gameInfo._leaderboardLoading = true;
     this.gameInfo._leaderboardData = null;
     try {
-      const data = await getTopScores(30);
+      const data = await getTopScores(20);
       this.gameInfo._leaderboardData = data;
       this.gameInfo._cacheLeaderboardFormattedDates(data);
     } catch (err) {
@@ -257,13 +257,25 @@ export default class Main {
     this.aniId = requestAnimationFrame(this._boundLoop);
   }
 
+  /** 获取玩家昵称（优先使用已缓存的值，否则重新从微信获取） */
+  async _ensureNickName() {
+    if (GameGlobal.nickName) return GameGlobal.nickName;
+    /* 尝试重新获取微信用户昵称 */
+    if (typeof GameGlobal.fetchWxNickName === 'function') {
+      const name = await GameGlobal.fetchWxNickName();
+      if (name) return name;
+    }
+    return 'Player';
+  }
+
   async submitScoreToServer() {
     if (this.databus.score <= 0) { this._scoreSubmitted = true; return; }
     this._scoreRetryCount = 0;
     try {
-      await submitScore('Player', this.databus.score);
+      const playerName = await this._ensureNickName();
+      await submitScore(playerName, this.databus.score);
       this._scoreSubmitted = true;
-      console.log('[Main] 分数提交成功');
+      console.log('[Main] 分数提交成功, 玩家名:', playerName);
     } catch (err) {
       console.error('[Main] 提交分数失败，3秒后重试:', err);
       this._scoreRetryTimer = 180;  /* 3秒后重试 */
@@ -273,7 +285,7 @@ export default class Main {
   }
 
   /** 分数提交重试（每帧调用，由 game over 块触发） */
-  _retryScoreSubmission() {
+  async _retryScoreSubmission() {
     if (this._scoreSubmitted) return;
     if (this._scoreRetryTimer <= 0) return;
     this._scoreRetryTimer--;
@@ -284,15 +296,15 @@ export default class Main {
       return;
     }
     this._scoreRetryCount++;
-    submitScore('Player', this.databus.score)
-      .then(() => {
-        this._scoreSubmitted = true;
-        console.log('[Main] 分数提交重试成功');
-      })
-      .catch((err) => {
-        console.error(`[Main] 分数提交重试第${this._scoreRetryCount}次失败:`, err);
-        this._scoreRetryTimer = 180;  /* 再等3秒 */
-      });
+    try {
+      const playerName = await this._ensureNickName();
+      await submitScore(playerName, this.databus.score);
+      this._scoreSubmitted = true;
+      console.log('[Main] 分数提交重试成功, 玩家名:', playerName);
+    } catch (err) {
+      console.error(`[Main] 分数提交重试第${this._scoreRetryCount}次失败:`, err);
+      this._scoreRetryTimer = 180;  /* 再等3秒 */
+    }
   }
 
   /* ========== 本地游戏逻辑 ========== */
