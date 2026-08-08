@@ -28,6 +28,8 @@ export default class Pipe extends Sprite {
   pipeType = PIPE_TYPE.NORMAL;
   baseGapY = 0;
   movePhase = 0;
+  hasTop = true;      /* 是否包含上管（init时计算） */
+  hasBottom = true;   /* 是否包含下管（init时计算） */
 
   constructor() {
     super('', PIPE_WIDTH, 0);
@@ -57,6 +59,10 @@ export default class Pipe extends Sprite {
     /* 移动管用红色，固定管用绿色，便于玩家区分 */
     this.pipeImg = this.pipeType === PIPE_TYPE.MOVING ? PIPE_RED_IMG : PIPE_GREEN_IMG;
 
+    /* 缓存 hasTop/hasBottom 避免每帧重复计算 */
+    this.hasTop = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.TOP_ONLY || this.pipeType === PIPE_TYPE.MOVING;
+    this.hasBottom = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.BOTTOM_ONLY || this.pipeType === PIPE_TYPE.MOVING;
+
     this._calcGapPosition();
   }
 
@@ -77,8 +83,8 @@ export default class Pipe extends Sprite {
         this.gapY = minBottom + Math.random() * Math.max(0, maxBottom - minBottom);
         break;
       }
-      case PIPE_TYPE.MOVING: {
-        /* 移动双管 */
+      default: {
+        /* 双管（NORMAL / MOVING）：gapY 逻辑相同 */
         const minGapY = PIPE_MIN_LENGTH;
         const maxGapY = availableH - this.gap - PIPE_MIN_LENGTH;
         if (maxGapY <= minGapY) {
@@ -89,20 +95,8 @@ export default class Pipe extends Sprite {
         } else {
           this.gapY = minGapY + Math.random() * (maxGapY - minGapY);
         }
-        this.baseGapY = this.gapY;
-        break;
-      }
-      default: {
-        /* 普通双管 */
-        const minGapY = PIPE_MIN_LENGTH;
-        const maxGapY = availableH - this.gap - PIPE_MIN_LENGTH;
-        if (maxGapY <= minGapY) {
-          /* 可用空间不足时，缩小gap确保通过 */
-          const actualGap = Math.max(BIRD_CLEARANCE, availableH - PIPE_MIN_LENGTH * 2);
-          this.gap = actualGap;
-          this.gapY = PIPE_MIN_LENGTH;
-        } else {
-          this.gapY = minGapY + Math.random() * (maxGapY - minGapY);
+        if (this.pipeType === PIPE_TYPE.MOVING) {
+          this.baseGapY = this.gapY;
         }
         break;
       }
@@ -133,10 +127,7 @@ export default class Pipe extends Sprite {
 
     const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
 
-    const hasTop = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.TOP_ONLY || this.pipeType === PIPE_TYPE.MOVING;
-    const hasBottom = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.BOTTOM_ONLY || this.pipeType === PIPE_TYPE.MOVING;
-
-    if (hasTop) {
+    if (this.hasTop) {
       /* 上管：翻转绘制 */
       const topH = this.gapY;
       ctx.save();
@@ -146,9 +137,9 @@ export default class Pipe extends Sprite {
       ctx.restore();
     }
 
-    if (hasBottom) {
+    if (this.hasBottom) {
       /* 下管：正常绘制 */
-      const bottomY = this.gapY + (hasTop ? this.gap : 0);
+      const bottomY = this.gapY + (this.hasTop ? this.gap : 0);
       const bottomH = availableH - bottomY;
       if (bottomH > 0) {
         ctx.drawImage(this.pipeImg, this.x, bottomY, this.width, bottomH);
@@ -161,11 +152,11 @@ export default class Pipe extends Sprite {
       const pw = this.width - 4;
       ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
       ctx.lineWidth = 2;
-      if (hasTop) {
+      if (this.hasTop) {
         ctx.strokeRect(px, 0, pw, this.gapY);
       }
-      if (hasBottom) {
-        const bottomY = this.gapY + (hasTop ? this.gap : 0);
+      if (this.hasBottom) {
+        const bottomY = this.gapY + (this.hasTop ? this.gap : 0);
         const bottomH = availableH - bottomY;
         if (bottomH > 0) {
           ctx.strokeRect(px, bottomY, pw, bottomH);
@@ -175,7 +166,7 @@ export default class Pipe extends Sprite {
       ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
-      ctx.strokeRect(px, this.gapY, pw, hasTop && hasBottom ? this.gap : 0);
+      ctx.strokeRect(px, this.gapY, pw, this.hasTop && this.hasBottom ? this.gap : 0);
       ctx.setLineDash([]);
     }
   }
@@ -192,15 +183,13 @@ export default class Pipe extends Sprite {
     const pw = this.width - 4;
 
     const availableH = SCREEN_HEIGHT - GROUND_OFFSET;
-    const hasTop = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.TOP_ONLY || this.pipeType === PIPE_TYPE.MOVING;
-    const hasBottom = this.pipeType === PIPE_TYPE.NORMAL || this.pipeType === PIPE_TYPE.BOTTOM_ONLY || this.pipeType === PIPE_TYPE.MOVING;
 
     if (bx + bw <= px || bx >= px + pw) return false;
 
-    if (hasTop && by < this.gapY) return true;
+    if (this.hasTop && by < this.gapY) return true;
 
-    if (hasBottom) {
-      const bottomY = this.gapY + (hasTop ? this.gap : 0);
+    if (this.hasBottom) {
+      const bottomY = this.gapY + (this.hasTop ? this.gap : 0);
       if (by + bh > bottomY && bottomY < availableH) return true;
     }
 

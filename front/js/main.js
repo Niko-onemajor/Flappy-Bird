@@ -43,8 +43,6 @@ const PROP_CHANCE_INCREMENT = 0.03;
 const PROP_COOLDOWN_MIN = 120;  /* 道具最小间隔帧数（2秒），防止扎堆 */
 
 const PIPE_WIDTH = PIPE.WIDTH;
-const PROP_SIZE = PROP_CFG.SIZE;
-const PROP_SAFE_MARGIN = PROP_CFG.SAFE_MARGIN;
 const MIN_SPACING = PIPE.MIN_SPACING;
 const MOVE_RANGE = PIPE.MOVE_RANGE;
 const JUMP_VELOCITY = PLAYER.JUMP_VELOCITY;
@@ -86,6 +84,8 @@ export default class Main {
   _countdownTimer = 0;
   _countdownStart = 0;
   _prevScreenState = null;
+  _shakeTimer = 0;          /* 屏幕抖动剩余帧数 */
+  _shakeIntensity = 0;      /* 屏幕抖动强度 */
 
   constructor() {
     this.player = new Player();
@@ -442,14 +442,7 @@ export default class Main {
       prop.x -= prop.speed;
 
       /* 跟随移动水管同步更新Y坐标 */
-      if (prop._parentPipe && prop._parentPipe.pipeType === 3) {
-        const p = prop._parentPipe;
-        const gapCenter = p.gapY + p.gap / 2;
-        const newY = gapCenter - PROP_SIZE / 2;
-        const minY = p.gapY + PROP_SAFE_MARGIN;
-        const maxY = p.gapY + p.gap - PROP_SAFE_MARGIN - PROP_SIZE;
-        prop.y = Math.max(minY, Math.min(maxY, newY));
-      }
+      prop.syncYWithMovingPipe();
 
       if (prop.x + prop.width < -10) {
         this.databus.removeProp(prop);
@@ -591,6 +584,12 @@ export default class Main {
       wx.vibrateShort({ type: 'light' });
     }
 
+    /* 屏幕抖动（根据设置） */
+    if (GameGlobal.settings && GameGlobal.settings.screenShake) {
+      this._shakeTimer = 8;
+      this._shakeIntensity = 6;
+    }
+
     if (this.databus.lives <= 0) {
       this.player.destroy();
       this.databus.gameOver();
@@ -604,15 +603,26 @@ export default class Main {
   render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    /* 屏幕抖动偏移 */
+    /* 检查来自 player/index.js 地面碰撞的抖动请求 */
+    if (GameGlobal._requestScreenShake) {
+      this._shakeTimer = Math.max(this._shakeTimer, GameGlobal._requestScreenShake.timer);
+      this._shakeIntensity = Math.max(this._shakeIntensity, GameGlobal._requestScreenShake.intensity);
+      GameGlobal._requestScreenShake = null;
+    }
+    const shakeX = this._shakeTimer > 0 ? (Math.random() - 0.5) * this._shakeIntensity : 0;
+    const shakeY = this._shakeTimer > 0 ? (Math.random() - 0.5) * this._shakeIntensity : 0;
+    if (this._shakeTimer > 0) this._shakeTimer--;
+
     /* 1. 背景全屏渲染（无缩放变换，填满 Canvas） */
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
     this.bg.renderFullScreen(ctx);
     ctx.restore();
 
-    /* 2. 游戏元素在设计分辨率空间内渲染（应用缩放变换） */
+    /* 2. 游戏元素在设计分辨率空间内渲染（应用缩放变换 + 抖动偏移） */
     ctx.save();
-    ctx.setTransform(GAME_SCALE, 0, 0, GAME_SCALE, GAME_OFFSET_X, GAME_OFFSET_Y);
+    ctx.setTransform(GAME_SCALE, 0, 0, GAME_SCALE, GAME_OFFSET_X + shakeX, GAME_OFFSET_Y + shakeY);
 
     if (this.screenState === SCREEN_STATE.HOME) {
       this.gameInfo.renderHome(ctx);

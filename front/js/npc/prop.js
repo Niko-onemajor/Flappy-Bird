@@ -66,31 +66,45 @@ export default class Prop extends Sprite {
     const safeTop = 50;
     const safeBottom = SCREEN_HEIGHT - GROUND.HEIGHT - 30;
 
-    const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
-    const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
+    const hasTop = pipe.hasTop;
+    const hasBottom = pipe.hasBottom;
 
     if (hasTop && hasBottom) {
-      /* 双管：放在间隙正中央，玩家必经之路 */
+      /* 双管：放在间隙正中央（左上角偏移半高，使道具中心对齐间隙中心） */
       const gapCenter = pipe.gapY + pipe.gap / 2;
-      const y = Math.max(safeTop + PROP_SIZE, Math.min(gapCenter, safeBottom - PROP_SIZE));
-      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 双管间隙中心=${gapCenter.toFixed(1)}, 最终y=${y.toFixed(1)}`);
+      const y = Math.max(safeTop, Math.min(gapCenter - PROP_SIZE / 2, safeBottom - PROP_SIZE));
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 双管间隙中心=${gapCenter.toFixed(1)}, 道具左上角y=${y.toFixed(1)}, 道具中心y=${(y + PROP_SIZE / 2).toFixed(1)}`);
       return y;
     } else if (hasBottom) {
-      /* 只有下管：放在下管上方安全区域，不堵死上方通路 */
-      const y = Math.max(safeTop + PROP_SIZE, pipe.gapY - PIPE_SAFE_MARGIN - PROP_SIZE);
-      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 下管上方, y=${y.toFixed(1)}`);
+      /* 只有下管：放在下管上方与屏幕顶端之间的中间位置 */
+      const passageMid = (0 + pipe.gapY) / 2;
+      const y = Math.max(safeTop, Math.min(passageMid - PROP_SIZE / 2, safeBottom - PROP_SIZE));
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 下管上方中间, 通道中心=${passageMid.toFixed(1)}, 道具左上角y=${y.toFixed(1)}`);
       return y;
     } else if (hasTop) {
-      /* 只有上管：放在上管下方安全区域，不堵死下方通路 */
-      const y = Math.min(safeBottom - PROP_SIZE, pipe.gapY + PIPE_SAFE_MARGIN + PROP_SIZE);
-      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 上管下方, y=${y.toFixed(1)}`);
+      /* 只有上管：放在上管下方与地面之间的中间位置 */
+      const passageMid = (pipe.gapY + safeBottom + PROP_SIZE) / 2;
+      const y = Math.max(safeTop, Math.min(passageMid - PROP_SIZE / 2, safeBottom - PROP_SIZE));
+      if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 上管下方中间, 通道中心=${passageMid.toFixed(1)}, 道具左上角y=${y.toFixed(1)}`);
       return y;
     }
 
     /* 兜底：屏幕中央 */
-    const y = (safeTop + safeBottom) / 2;
+    const y = (safeTop + safeBottom - PROP_SIZE) / 2;
     if (GameGlobal.DEBUG_LOG) console.log(`[Prop] 兜底中央, y=${y.toFixed(1)}`);
     return y;
+  }
+
+  /* 当水管移动时同步更新道具Y坐标（仅MOVING类型水管需要） */
+  syncYWithMovingPipe() {
+    const p = this._parentPipe;
+    if (!p || p.pipeType !== 3) return;
+
+    const gapCenter = p.gapY + p.gap / 2;
+    const newY = gapCenter - PROP_SIZE / 2;
+    const minY = p.gapY + PIPE_SAFE_MARGIN;
+    const maxY = p.gapY + p.gap - PIPE_SAFE_MARGIN - PROP_SIZE;
+    this.y = Math.max(minY, Math.min(maxY, newY));
   }
 
   update() {

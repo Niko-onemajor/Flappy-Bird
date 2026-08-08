@@ -39,8 +39,8 @@ export default class Saw extends Sprite {
     const safeBottom = availableH - SAW_SIZE - 10;
     const margin = 8;
 
-    const hasTop = pipe.pipeType === 0 || pipe.pipeType === 1 || pipe.pipeType === 3;
-    const hasBottom = pipe.pipeType === 0 || pipe.pipeType === 2 || pipe.pipeType === 3;
+    const hasTop = pipe.hasTop;
+    const hasBottom = pipe.hasBottom;
 
     if (hasTop && hasBottom) {
       /* 双管：锯片放在间隙上方（靠近上管底）或下方（靠近下管顶），不堵间隙 */
@@ -118,9 +118,9 @@ export default class Saw extends Sprite {
     const scy = this.y + this.height / 2;
     const dx = pcx - scx;
     const dy = pcy - scy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
     const hitR = this.width / 2 - 4;
+    const threshold = bird.width / 2 + hitR;
 
-    return dist < (bird.width / 2 + hitR);
+    return dx * dx + dy * dy < threshold * threshold;
   }
 }

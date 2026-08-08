@@ -58,13 +58,16 @@ export default class GameInfo extends Emitter {
     this._scrollStartY = 0;          /* 触摸起始时的滚动位置 */
     this._countdownValue = 0;        /* 倒计时秒数 */
     this._bestScoreSaved = false;    /* 最佳成绩是否已保存 */
+    this._cachedBestScore = null;     /* 最佳成绩缓存，避免每帧读存储 */
+    this._showQuitConfirm = false;   /* 结束游戏二次确认弹窗 */
+    this._draggingSlider = null;     /* 当前正在拖拽的滑动条 */
 
-    /* 暂停按钮（左上角） */
+    /* 暂停按钮（左上角，正方形36×36） */
     this.pauseBtnArea = {
       startX: 10,
       startY: 8,
       endX: 46,
-      endY: 42,
+      endY: 44,
     };
 
     /* 暂停面板按钮 */
@@ -135,12 +138,26 @@ export default class GameInfo extends Emitter {
     /* 同步音量通道到 Sound 管理器 */
     this._applySettingsToSound();
 
-    /* 主页设置按钮（左上角） */
+    /* 结束游戏二次确认按钮区域 */
+    this._quitConfirmBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 60,
+      startY: SCREEN_HEIGHT / 2 + 10,
+      endX: SCREEN_WIDTH / 2 + 60,
+      endY: SCREEN_HEIGHT / 2 + 50,
+    };
+    this._quitCancelBtnArea = {
+      startX: SCREEN_WIDTH / 2 - 60,
+      startY: SCREEN_HEIGHT / 2 + 60,
+      endX: SCREEN_WIDTH / 2 + 60,
+      endY: SCREEN_HEIGHT / 2 + 100,
+    };
+
+    /* 主页设置按钮（左上角，正方形36×36） */
     this.homeSettingsBtnArea = {
       startX: 10,
       startY: 8,
       endX: 46,
-      endY: 42,
+      endY: 44,
     };
 
     /* ========== 设置面板区域（在 430×932 设计分辨率下居中） ========== */
@@ -418,9 +435,10 @@ export default class GameInfo extends Emitter {
 
   /* ========== 渲染（主入口） ========== */
   renderLocal(ctx, databus) {
-    /* 重置最佳成绩保存标记（游戏非结束状态时） */
+    /* 重置游戏结束相关状态（游戏非结束状态时） */
     if (!databus.isGameOver) {
       this._bestScoreSaved = false;
+      this._cachedBestScore = null;
     }
 
     /* 使用数字图片显示分数 */
@@ -558,7 +576,7 @@ export default class GameInfo extends Emitter {
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('⏸', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2);
+    ctx.fillText('⏸', (btn.startX + btn.endX) / 2, (btn.startY + btn.endY) / 2 + 1);
   }
 
   /* ========== 生命值显示 ========== */
@@ -591,6 +609,12 @@ export default class GameInfo extends Emitter {
     /* 半透明遮罩 */
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 二次确认弹窗 */
+    if (this._showQuitConfirm) {
+      this._renderQuitConfirm(ctx);
+      return;
+    }
 
     /* 标题 */
     ctx.fillStyle = '#ffffff';
@@ -633,6 +657,59 @@ export default class GameInfo extends Emitter {
     ctx.fillText('结束游戏', (quitBtn.startX + quitBtn.endX) / 2, (quitBtn.startY + quitBtn.endY) / 2);
   }
 
+  /* ========== 结束游戏二次确认弹窗 ========== */
+  _renderQuitConfirm(ctx) {
+    /* 半透明遮罩（比暂停更暗） */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 确认弹窗框 */
+    const dx = SCREEN_WIDTH / 2 - 100;
+    const dy = SCREEN_HEIGHT / 2 - 70;
+    const dw = 200;
+    const dh = 195;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, dx, dy, dw, dh, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    /* 提示文字 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('确认结束游戏？', SCREEN_WIDTH / 2, dy + 35);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '13px Arial';
+    ctx.fillText('当前进度将不会保存', SCREEN_WIDTH / 2, dy + 58);
+
+    /* 确认按钮 */
+    const confirmBtn = this._quitConfirmBtnArea;
+    ctx.fillStyle = '#f44336';
+    ctx.strokeStyle = '#B71C1C';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, confirmBtn.startX, confirmBtn.startY, confirmBtn.endX - confirmBtn.startX, confirmBtn.endY - confirmBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('确认结束', (confirmBtn.startX + confirmBtn.endX) / 2, (confirmBtn.startY + confirmBtn.endY) / 2);
+
+    /* 取消按钮 */
+    const cancelBtn = this._quitCancelBtnArea;
+    ctx.fillStyle = '#555555';
+    ctx.strokeStyle = '#333333';
+    this._roundRect(ctx, cancelBtn.startX, cancelBtn.startY, cancelBtn.endX - cancelBtn.startX, cancelBtn.endY - cancelBtn.startY, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('取消', (cancelBtn.startX + cancelBtn.endX) / 2, (cancelBtn.startY + cancelBtn.endY) / 2);
+  }
+
   /* ========== 倒计时 ========== */
   renderCountdown(ctx) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -662,10 +739,10 @@ export default class GameInfo extends Emitter {
     this._roundRect(ctx, area.startX, area.startY, w, h, 6);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
+    ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('⚙', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2);
+    ctx.fillText('⚙', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2 + 1);
   }
 
   /* ========== 设置面板渲染 ========== */
@@ -922,6 +999,17 @@ export default class GameInfo extends Emitter {
 
     /* ===== 暂停状态 ===== */
     if (GameGlobal.screenState === 'paused') {
+      /* 二次确认弹窗中的交互 */
+      if (this._showQuitConfirm) {
+        if (this._isInArea(game, this._quitConfirmBtnArea)) {
+          this._showQuitConfirm = false;
+          this.emit('quitToHome');
+        } else if (this._isInArea(game, this._quitCancelBtnArea)) {
+          this._showQuitConfirm = false;
+        }
+        return;
+      }
+
       if (
         game.x >= this.resumeBtnArea.startX &&
         game.x <= this.resumeBtnArea.endX &&
@@ -937,7 +1025,7 @@ export default class GameInfo extends Emitter {
         game.y >= this.quitBtnArea.startY &&
         game.y <= this.quitBtnArea.endY
       ) {
-        this.emit('quitToHome');
+        this._showQuitConfirm = true;
         return;
       }
       if (
@@ -982,6 +1070,7 @@ export default class GameInfo extends Emitter {
   _handleSettingsTouch(game) {
     /* 返回按钮 */
     if (this._isInArea(game, this.settingsBackBtnArea)) {
+      this._draggingSlider = null;
       this.emit('hideSettings');
       return;
     }
@@ -992,15 +1081,8 @@ export default class GameInfo extends Emitter {
       if (!area) continue;
       if (game.x >= area.startX && game.x <= area.endX &&
           game.y >= area.startY && game.y <= area.endY) {
-        /* 计算滑块值 */
-        const sliderW = area.endX - area.startX;
-        const rawValue = (game.x - area.startX) / sliderW;
-        const value = Math.max(0, Math.min(1, rawValue));
-        const settingKey = key + 'Volume';
-        this.settings[settingKey] = value;
-        GameGlobal.settings[settingKey] = value;
-        this._saveSettings();
-        this._applySettingsToSound();
+        this._draggingSlider = key;
+        this._updateSliderValue(key, game);
         return;
       }
     }
@@ -1019,8 +1101,32 @@ export default class GameInfo extends Emitter {
     }
   }
 
-  /* ========== 触摸滑动（排行榜滚动） ========== */
+  /* 更新滑动条数值 */
+  _updateSliderValue(key, game) {
+    const cfg = this._sliderAreas[key];
+    const area = cfg._area;
+    if (!area) return;
+    const sliderW = area.endX - area.startX;
+    const rawValue = (game.x - area.startX) / sliderW;
+    const value = Math.max(0, Math.min(1, rawValue));
+    const settingKey = key + 'Volume';
+    this.settings[settingKey] = value;
+    GameGlobal.settings[settingKey] = value;
+    this._saveSettings();
+    this._applySettingsToSound();
+  }
+
+  /* ========== 触摸滑动（设置面板拖动 + 排行榜滚动） ========== */
   touchMoveHandler(event) {
+    /* 设置面板音量滑动条拖动 */
+    if (GameGlobal.screenState === 'settings' && this._draggingSlider) {
+      if (!event.touches || event.touches.length === 0) return;
+      const { clientX, clientY } = event.touches[0];
+      const game = toGameCoord(clientX, clientY);
+      this._updateSliderValue(this._draggingSlider, game);
+      return;
+    }
+
     if (GameGlobal.screenState !== 'leaderboard') return;
     if (!event.touches || event.touches.length === 0) return;
     if (this._leaderboardMaxScroll <= 0) return;
@@ -1041,6 +1147,7 @@ export default class GameInfo extends Emitter {
   /* 触摸结束，清除状态 */
   touchEndHandler() {
     this._touchStartY = null;
+    this._draggingSlider = null;
   }
 
   /* ========== 辅助方法 ========== */
@@ -1059,17 +1166,21 @@ export default class GameInfo extends Emitter {
   }
 
   _getBestScore() {
-    try {
-      const val = wx.getStorageSync('flappy_best');
-      return val !== '' ? val : 0;
-    } catch (e) {
-      return 0;
+    if (this._cachedBestScore === null) {
+      try {
+        const val = wx.getStorageSync('flappy_best');
+        this._cachedBestScore = val !== '' ? val : 0;
+      } catch (e) {
+        this._cachedBestScore = 0;
+      }
     }
+    return this._cachedBestScore;
   }
 
   _saveBestScore(score) {
     try {
       wx.setStorageSync('flappy_best', score);
+      this._cachedBestScore = score;
     } catch (e) {
       /* 忽略 */
     }
