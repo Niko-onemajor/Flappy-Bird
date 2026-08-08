@@ -1000,13 +1000,15 @@ export default class GameInfo extends Emitter {
 
   /* ========== 自定义昵称对话框 ========== */
 
-  /** 弹出自定义昵称对话框 */
+  /** 弹出自定义昵称对话框（自动弹出系统键盘） */
   _showNicknameInput() {
     this._showNameDialog = true;
     this._nameDialogText = GameGlobal.nickName || '';
     this._nameDialogBtnPress = 0;
     this._nameDialogSuccess = false;
     this._nameDialogSuccessTimer = 0;
+    /* 对话框打开后立即弹出系统键盘，无需用户点击输入框 */
+    this._showKeyboardInput();
   }
 
   /** 关闭昵称对话框并清理状态 */
@@ -1215,10 +1217,15 @@ export default class GameInfo extends Emitter {
   _handleKeyboardConfirm(res) {
     if (!res || !res.value) return;
     const name = res.value.trim();
-    /* 对话框打开时：更新对话框文字 */
     if (this._showNameDialog) {
       this._nameDialogText = name;
-      /* 不自动关闭键盘，让用户手动点击确认按钮保存 */
+      /* 用户按键盘"完成"时自动保存，无需再点击画面上的确认按钮 */
+      if (this._saveNickname(name)) {
+        wx.hideKeyboard({});
+        this._nameDialogBtnPress = 6;
+        this._nameDialogSuccess = true;
+        this._nameDialogSuccessTimer = 30;
+      }
       return;
     }
     /* 对话框未打开（旧路径兼容）：直接保存 */
