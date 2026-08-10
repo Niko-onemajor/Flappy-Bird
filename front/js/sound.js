@@ -17,8 +17,8 @@ const AUDIO_CONFIG = {
   shieldBreak: { src: 'audio/shield_break.mp3', volume: AUDIO_VOLUME.shieldBreak },
   shieldPickup: { src: 'audio/shield_pickup.mp3', volume: AUDIO_VOLUME.shieldPickup },
   scoreX2: { src: 'audio/score_x2.mp3', volume: AUDIO_VOLUME.scoreX2 },
-  fuseBurn: { src: 'audio/fuse_burn.mp3', volume: AUDIO_VOLUME.fuseBurn },
-  rocketFly: { src: 'audio/rocket_fly.mp3', volume: AUDIO_VOLUME.rocketFly },
+  fuseBurn: { src: 'audio/fuse_burn.mp3', volume: AUDIO_VOLUME.fuseBurn, loop: true },
+  rocketFly: { src: 'audio/rocket_fly.mp3', volume: AUDIO_VOLUME.rocketFly, loop: true },
 };
 
 /** 判断音频键属于 BGM 还是音效 */
@@ -123,17 +123,13 @@ export default class Sound {
   playShieldPickup() { this._playSimple('shieldPickup'); }
   playScoreX2() { this._playSimple('scoreX2'); }
 
-  /* 火箭引信点燃：只播一次，不重叠 */
+  /* 火箭引信点燃：循环播放，持续至追踪结束 */
   playFuseBurn() {
     if (this._fuseBurnPlaying) return;
     this._fuseBurnPlaying = true;
     this._fuseBurnDynamicVol = 0.2;  /* 初始低音量 */
     const a = this._getAudio('fuseBurn');
     a.seek(0);
-    a.onEnded(() => {
-      this._fuseBurnPlaying = false;
-      this._fuseBurnDynamicVol = 1.0;
-    });
     a.play();
   }
 
@@ -147,15 +143,12 @@ export default class Sound {
     }
   }
 
-  /* 火箭飞行音效：只播一次，不重叠 */
+  /* 火箭飞行音效：循环播放，持续至火箭离屏 */
   playRocketFly() {
     if (this._rocketFlyPlaying) return;
     this._rocketFlyPlaying = true;
     const a = this._getAudio('rocketFly');
     a.seek(0);
-    a.onEnded(() => {
-      this._rocketFlyPlaying = false;
-    });
     a.play();
   }
 
