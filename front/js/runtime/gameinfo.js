@@ -366,7 +366,7 @@ export default class GameInfo extends Emitter {
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('← 返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
+    ctx.fillText('返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
 
     const data = this._leaderboardData;
     if (this._leaderboardLoading) {

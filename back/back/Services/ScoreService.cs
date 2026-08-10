@@ -55,8 +55,10 @@ public class ScoreService
         if (playerNames == null || playerNames.Count == 0)
             return 0;
 
+        /* 同时也清理玩家名称为空或 null 的记录 */
         var toDelete = await _db.HighScores
-            .Where(s => playerNames.Contains(s.PlayerName))
+            .Where(s => playerNames.Contains(s.PlayerName)
+                     || (playerNames.Contains("Anonymous") && (s.PlayerName == null || s.PlayerName == "")))
             .ToListAsync();
 
         if (toDelete.Count == 0)

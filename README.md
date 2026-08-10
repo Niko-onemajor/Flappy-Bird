@@ -100,7 +100,8 @@ Flappy-Bird/
 │   ├── sql/init.sql              # 数据库初始化脚本
 │   └── Program.cs                # 应用入口
 │
-├── test_props.py                 # 道具位置验证脚本
+├── test_props.py                 # 道具位置验证脚本（Python）
+├── test_api.ps1                  # 后端 API 自动化测试脚本（PowerShell）
 └── AGENTS.md                     # 项目开发规范
 ```
 
@@ -171,6 +172,7 @@ netsh advfirewall firewall add rule name="FlappyBird" dir=in action=allow protoc
 |:---|:---|:---|
 | POST | `/api/score` | 提交分数 |
 | GET | `/api/score?limit=10` | 获取排行榜（最多 20 名） |
+| POST | `/api/score/cleanup` | 清理测试数据（按玩家名称列表删除） |
 | POST | `/api/game/start` | 开始游戏（旧版服务端模式） |
 | POST | `/api/game/{id}/tick` | 游戏帧推进（旧版） |
 | POST | `/api/game/{id}/flap` | 跳跃（旧版） |
@@ -197,6 +199,12 @@ netsh advfirewall firewall add rule name="FlappyBird" dir=in action=allow protoc
 ```bash
 cd back/back
 npx newman run postman/FlappyBird_API_Collection.json
+```
+
+### API 测试（PowerShell）
+
+```powershell
+.\test_api.ps1          # 测试所有 API 接口，完成后自动清理测试数据
 ```
 
 ### 道具位置验证
