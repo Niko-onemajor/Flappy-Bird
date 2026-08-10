@@ -207,6 +207,29 @@ export default class GameInfo extends Emitter {
       endY: 44,
     };
 
+    /* 主页游戏指南按钮（右上角，正方形36×36） */
+    this.guideBtnArea = {
+      startX: SCREEN_WIDTH - 46,
+      startY: 8,
+      endX: SCREEN_WIDTH - 10,
+      endY: 44,
+    };
+
+    /* 游戏指南面板 */
+    this._showGameGuide = false;
+    this._guidePanelX = SCREEN_WIDTH / 2 - 160;
+    this._guidePanelY = SCREEN_HEIGHT / 2 - 175;
+    this._guidePanelW = 320;
+    this._guidePanelH = 350;
+
+    /* 游戏指南关闭按钮 */
+    this._guideCloseBtnArea = {
+      startX: this._guidePanelX + this._guidePanelW - 46,
+      startY: this._guidePanelY + 8,
+      endX: this._guidePanelX + this._guidePanelW - 10,
+      endY: this._guidePanelY + 44,
+    };
+
     /* ========== 设置面板区域（在 430×932 设计分辨率下居中） ========== */
     this._panelX = SCREEN_WIDTH / 2 - 140;
     this._panelY = SCREEN_HEIGHT / 2 - 180;
@@ -315,6 +338,15 @@ export default class GameInfo extends Emitter {
 
     /* 设置按钮（右上角） */
     this._renderSettingsBtn(ctx, this.homeSettingsBtnArea);
+
+    /* 游戏指南按钮（右上角） */
+    this._renderGuideBtn(ctx);
+
+    /* 游戏指南面板 */
+    if (this._showGameGuide) {
+      this.renderGameGuide(ctx);
+      return;
+    }
 
     /* 排行榜按钮 */
     const lbBtn = this.leaderboardBtnArea;
@@ -496,21 +528,18 @@ export default class GameInfo extends Emitter {
     const cx = SCREEN_WIDTH / 2;
     const cy = SCREEN_HEIGHT / 2 - 30;
 
-    ctx.strokeText('点击屏幕飞起，3条命+护盾可抵挡伤害', cx, cy - 20);
-    ctx.fillText('点击屏幕飞起，3条命+护盾可抵挡伤害', cx, cy - 20);
+    ctx.strokeText('点击屏幕让小鸟飞起来', cx, cy - 20);
+    ctx.fillText('点击屏幕让小鸟飞起来', cx, cy - 20);
 
     ctx.font = '14px Arial';
-    ctx.strokeText('圆锯吸附于水管间隙，火箭追踪飞射 — 分数越高越难', cx, cy + 10);
-    ctx.fillText('圆锯吸附于水管间隙，火箭追踪飞射 — 分数越高越难', cx, cy + 10);
-
-    ctx.strokeText('拾取双倍分数 x2 持续 6 秒，避开障碍飞得更远！', cx, cy + 35);
-    ctx.fillText('拾取双倍分数 x2 持续 6 秒，避开障碍飞得更远！', cx, cy + 35);
+    ctx.strokeText('躲避水管等障碍物，飞得越远分数越高！', cx, cy + 15);
+    ctx.fillText('躲避水管等障碍物，飞得越远分数越高！', cx, cy + 15);
 
     /* 闪烁的"点击开始"（使用帧计数器，避免每帧 Date.now() 开销） */
     const alpha = 0.5 + 0.5 * Math.sin((GameGlobal.databus.frame * 0.12));
     ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
     ctx.font = 'bold 16px Arial';
-    ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 65);
+    ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 55);
   }
 
   /* ========== 渲染（主入口） ========== */
@@ -981,6 +1010,119 @@ export default class GameInfo extends Emitter {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('⚙', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2 + 1);
+  }
+
+  /* ========== 游戏指南按钮（右上角感叹号） ========== */
+  _renderGuideBtn(ctx) {
+    const area = this.guideBtnArea;
+    const w = area.endX - area.startX;
+    const h = area.endY - area.startY;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    this._roundRect(ctx, area.startX, area.startY, w, h, 6);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('!', (area.startX + area.endX) / 2, (area.startY + area.endY) / 2 + 1);
+  }
+
+  /* ========== 游戏指南面板 ========== */
+  renderGameGuide(ctx) {
+    const px = this._guidePanelX;
+    const py = this._guidePanelY;
+    const pw = this._guidePanelW;
+    const ph = this._guidePanelH;
+
+    /* 半透明背景 */
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    /* 面板背景 */
+    ctx.fillStyle = '#1a1a2e';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    this._roundRect(ctx, px, py, pw, ph, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    /* 标题 */
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('游戏指南', SCREEN_WIDTH / 2, py + 22);
+
+    /* 关闭按钮 */
+    const closeBtn = this._guideCloseBtnArea;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.beginPath();
+    ctx.arc((closeBtn.startX + closeBtn.endX) / 2, (closeBtn.startY + closeBtn.endY) / 2, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✕', (closeBtn.startX + closeBtn.endX) / 2, (closeBtn.startY + closeBtn.endY) / 2);
+
+    /* 分割线 */
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 20, py + 46);
+    ctx.lineTo(px + pw - 20, py + 46);
+    ctx.stroke();
+
+    /* 内容区域 */
+    const contentX = px + 20;
+    let contentY = py + 65;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    const sections = [
+      {
+        title: '🎮 基本操作',
+        lines: ['点击屏幕让小鸟飞起，3条命+护盾可抵挡伤害，受伤后短暂无敌'],
+      },
+      {
+        title: '✨ 道具效果',
+        lines: [
+          '护盾 — 金色光环，抵挡一次碰撞',
+          '双倍分数 — x2 持续 6 秒',
+        ],
+      },
+      {
+        title: '⚠️ 障碍物',
+        lines: [
+          '水管 — 主要障碍物，始终存在',
+          '圆锯 — 5 分后出现，吸附于水管间隙旋转',
+          '火箭 — 10 分后出现，追踪玩家后直线飞射',
+        ],
+      },
+      {
+        title: '📈 难度机制',
+        lines: ['分数越高，速度越快、间隙越小、水管越密'],
+      },
+    ];
+
+    sections.forEach((section) => {
+      /* 小节标题 */
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 15px Arial';
+      ctx.fillText(section.title, contentX, contentY);
+      contentY += 22;
+
+      /* 小节内容 */
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.font = '13px Arial';
+      section.lines.forEach((line) => {
+        ctx.fillText(line, contentX + 8, contentY);
+        contentY += 20;
+      });
+
+      contentY += 8; /* 小节间距 */
+    });
   }
 
   /* ========== 玩家昵称按钮 ========== */
@@ -1454,9 +1596,27 @@ export default class GameInfo extends Emitter {
 
     /* ===== 主页 ===== */
     if (GameGlobal.screenState === 'home') {
+      /* 游戏指南面板打开时：处理关闭和外部点击 */
+      if (this._showGameGuide) {
+        if (this._isInArea(game, this._guideCloseBtnArea)) {
+          this._showGameGuide = false;
+          return;
+        }
+        /* 点击面板外部关闭 */
+        if (game.x < this._guidePanelX || game.x > this._guidePanelX + this._guidePanelW ||
+            game.y < this._guidePanelY || game.y > this._guidePanelY + this._guidePanelH) {
+          this._showGameGuide = false;
+        }
+        return;
+      }
       /* 设置按钮 */
       if (this._isInArea(game, this.homeSettingsBtnArea)) {
         this.emit('showSettings');
+        return;
+      }
+      /* 游戏指南按钮 */
+      if (this._isInArea(game, this.guideBtnArea)) {
+        this._showGameGuide = true;
         return;
       }
       /* 玩家昵称按钮 */
