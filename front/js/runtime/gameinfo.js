@@ -496,18 +496,21 @@ export default class GameInfo extends Emitter {
     const cx = SCREEN_WIDTH / 2;
     const cy = SCREEN_HEIGHT / 2 - 30;
 
-    ctx.strokeText('点击屏幕让小鸟飞起来', cx, cy - 20);
-    ctx.fillText('点击屏幕让小鸟飞起来', cx, cy - 20);
+    ctx.strokeText('点击屏幕飞起，3条命+护盾可抵挡伤害', cx, cy - 20);
+    ctx.fillText('点击屏幕飞起，3条命+护盾可抵挡伤害', cx, cy - 20);
 
     ctx.font = '14px Arial';
-    ctx.strokeText('躲避水管，飞得越远分数越高！', cx, cy + 15);
-    ctx.fillText('躲避水管，飞得越远分数越高！', cx, cy + 15);
+    ctx.strokeText('圆锯吸附于水管间隙，火箭追踪飞射 — 分数越高越难', cx, cy + 10);
+    ctx.fillText('圆锯吸附于水管间隙，火箭追踪飞射 — 分数越高越难', cx, cy + 10);
+
+    ctx.strokeText('拾取双倍分数 x2 持续 6 秒，避开障碍飞得更远！', cx, cy + 35);
+    ctx.fillText('拾取双倍分数 x2 持续 6 秒，避开障碍飞得更远！', cx, cy + 35);
 
     /* 闪烁的"点击开始"（使用帧计数器，避免每帧 Date.now() 开销） */
     const alpha = 0.5 + 0.5 * Math.sin((GameGlobal.databus.frame * 0.12));
     ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
     ctx.font = 'bold 16px Arial';
-    ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 55);
+    ctx.fillText('👆 点击任意位置开始 👆', cx, cy + 65);
   }
 
   /* ========== 渲染（主入口） ========== */
