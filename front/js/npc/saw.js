@@ -54,14 +54,24 @@ export default class Saw extends Sprite {
     const hasBottom = pipe.hasBottom;
 
     if (hasTop && hasBottom) {
-      /* 双管：锯片放在间隙上方（靠近上管底）或下方（靠近下管顶），不堵间隙 */
-      if (Math.random() < 0.5) {
-        const y = pipe.gapY - SAW_SIZE - margin;
-        return Math.max(safeTop, y);
-      } else {
-        const y = pipe.gapY + pipe.gap + margin;
-        return Math.min(safeBottom, y);
+      /* 双管：锯片放在间隙上方或下方，永远不堵间隙 */
+      const aboveY = pipe.gapY - SAW_SIZE - margin;
+      const belowY = pipe.gapY + pipe.gap + margin;
+
+      /* 优先放在上方（间隙上方 margin 像素） */
+      if (aboveY >= safeTop) {
+        return aboveY;
       }
+
+      /* 上方被 safeTop 夹进间隙（间隙太靠上），改放在下方 */
+      /* belowY = gapBottom + margin，永远在间隙底部下方，不堵间隙 */
+      const clampedBelow = Math.min(safeBottom, belowY);
+      if (clampedBelow >= pipe.gapY + pipe.gap) {
+        return clampedBelow;
+      }
+
+      /* 下方也被夹（间隙太靠下），回退到 safeTop */
+      return safeTop;
     }
 
     if (hasBottom) {

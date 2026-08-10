@@ -234,6 +234,36 @@
               "path": ["api", "score"]
             }
           }
+        },
+        {
+          "name": "3. 清理测试数据",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('返回 deletedCount', () => pm.expect(json).to.have.property('deletedCount'));",
+                  "console.log('已清理', json.deletedCount, '条测试记录');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerNames\": [\"TestPlayer\", \"ZeroPlayer\", \"HighScorePlayer\", \"Anonymous\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score/cleanup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score", "cleanup"]
+            }
+          }
         }
       ]
     },

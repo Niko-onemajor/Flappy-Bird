@@ -15,9 +15,10 @@ public class ScoreService
 
     public async Task<HighScoreDto> SubmitScoreAsync(SubmitScoreRequest request)
     {
+        var playerName = string.IsNullOrEmpty(request.PlayerName) ? "Anonymous" : request.PlayerName;
         var entry = new HighScore
         {
-            PlayerName = request.PlayerName,
+            PlayerName = playerName,
             Score = request.Score,
             CreatedAt = DateTime.UtcNow,
         };
@@ -46,5 +47,23 @@ public class ScoreService
                 CreatedAt = s.CreatedAt,
             })
             .ToListAsync();
+    }
+
+    /// <summary>删除指定玩家名称的分数记录（用于测试数据清理）</summary>
+    public async Task<int> DeleteByPlayerNamesAsync(List<string> playerNames)
+    {
+        if (playerNames == null || playerNames.Count == 0)
+            return 0;
+
+        var toDelete = await _db.HighScores
+            .Where(s => playerNames.Contains(s.PlayerName))
+            .ToListAsync();
+
+        if (toDelete.Count == 0)
+            return 0;
+
+        _db.HighScores.RemoveRange(toDelete);
+        await _db.SaveChangesAsync();
+        return toDelete.Count;
     }
 }

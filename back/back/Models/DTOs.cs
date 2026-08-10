@@ -13,6 +13,11 @@ public class SubmitScoreRequest
     public int Score { get; set; }
 }
 
+public class CleanupScoresRequest
+{
+    public List<string> PlayerNames { get; set; } = [];
+}
+
 /* ========== 响应 ========== */
 public class GameStateResponse
 {

@@ -258,12 +258,21 @@ class GameSimulator:
         margin = 8
 
         if pipe.has_top and pipe.has_bottom:
-            if self.rng.random() < 0.5:
-                y = pipe.gap_y - SAW_SIZE - margin
-                return max(safe_top, y)
-            else:
-                y = pipe.gap_y + pipe.gap + margin
-                return min(safe_bottom, y)
+            above_y = pipe.gap_y - SAW_SIZE - margin
+            below_y = pipe.gap_y + pipe.gap + margin
+
+            # 优先放在上方（间隙上方 margin 像素）
+            if above_y >= safe_top:
+                return above_y
+
+            # 上方被 safe_top 夹进间隙（间隙太靠上），改放在下方
+            # below_y = gap_bottom + margin，永远在间隙底部下方，不堵间隙
+            clamped_below = min(safe_bottom, below_y)
+            if clamped_below >= pipe.gap_y + pipe.gap:
+                return clamped_below
+
+            # 下方也被夹（间隙太靠下），回退到 safe_top
+            return safe_top
 
         if pipe.has_bottom:
             y = pipe.gap_y - SAW_SIZE - margin
