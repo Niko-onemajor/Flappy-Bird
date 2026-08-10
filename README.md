@@ -6,7 +6,7 @@
 
 | 主页 | 游戏进行中 | 排行榜 |
 |:---:|:---:|:---:|
-| ![主页](front/images/screenshot_home.jpg) | ![游戏进行中](front/images/screenshot_gameplay.jpg) | ![排行榜](front/images/screenshot_leaderboard.jpg) |
+| ![主页](front/images/screenshot_home.png) | ![游戏进行中](front/images/screenshot_gameplay.png) | ![排行榜](front/images/screenshot_leaderboard.png) |
 
 ## 技术栈
 

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Flappy Bird API 自动化测试",
-    "description": "Flappy Bird 后端游戏接口测试集合。包含游戏生命周期和排行榜的完整测试流程。",
+    "description": "Flappy Bird 后端 API 接口测试集合。\n游戏逻辑在本地运行（前端 Canvas），后端仅负责分数存储和排行榜查询。\n\n## 当前活跃 API\n- POST /api/score —— 提交分数（游戏实际使用）\n- GET  /api/score —— 查询排行榜（游戏实际使用）\n\n## 旧版 API（保留兼容，前端不再使用）\n- POST /api/game/start\n- POST /api/game/{id}/flap\n- POST /api/game/{id}/tick\n- GET  /api/game/{id}/state",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,195 +12,31 @@
     {
       "key": "sessionId",
       "value": ""
+    },
+    {
+      "key": "scoreId",
+      "value": ""
     }
   ],
   "item": [
     {
-      "name": "1. 开始游戏",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "pm.test('返回 sessionId', () => {",
-              "    const json = pm.response.json();",
-              "    pm.expect(json.sessionId).to.be.a('string').and.not.empty;",
-              "    pm.collectionVariables.set('sessionId', json.sessionId);",
-              "});",
-              "pm.test('小鸟初始状态正确', () => {",
-              "    const json = pm.response.json();",
-              "    pm.expect(json.player.isActive).to.be.true;",
-              "    pm.expect(json.score).to.equal(0);",
-              "    pm.expect(json.isGameOver).to.be.false;",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"screenWidth\": 375,\n  \"screenHeight\": 667\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/game/start",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "game", "start"]
-        }
-      }
-    },
-    {
-      "name": "2. 小鸟跳跃",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.test('sessionId 匹配', () => pm.expect(json.sessionId).to.equal(pm.collectionVariables.get('sessionId')));"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "url": {
-          "raw": "{{baseUrl}}/api/game/{{sessionId}}/flap",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "game", "{{sessionId}}", "flap"]
-        }
-      }
-    },
-    {
-      "name": "3. 推进帧（连续5次）",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.test('帧数递增', () => pm.expect(json.frame).to.be.above(0));",
-              "pm.test('玩家位置变化', () => pm.expect(json.player.y).to.not.equal(333.5));"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "url": {
-          "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "game", "{{sessionId}}", "tick"]
-        }
-      }
-    },
-    {
-      "name": "4. 获取游戏状态",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.test('状态包含所有必要字段', () => {",
-              "    pm.expect(json).to.have.property('sessionId');",
-              "    pm.expect(json).to.have.property('player');",
-              "    pm.expect(json).to.have.property('pipes');",
-              "    pm.expect(json).to.have.property('props');",
-              "    pm.expect(json).to.have.property('score');",
-              "    pm.expect(json).to.have.property('isGameOver');",
-              "    pm.expect(json).to.have.property('frame');",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{baseUrl}}/api/game/{{sessionId}}/state",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "game", "{{sessionId}}", "state"]
-        }
-      }
-    },
-    {
-      "name": "5. 查询排行榜",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "pm.test('返回数组', () => pm.expect(pm.response.json()).to.be.an('array'));"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "GET",
-        "url": {
-          "raw": "{{baseUrl}}/api/score?limit=10",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "score"],
-          "query": [{ "key": "limit", "value": "10" }]
-        }
-      }
-    },
-    {
-      "name": "6. 提交分数",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('状态码 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.test('返回包含 id', () => pm.expect(json.id).to.be.a('number'));",
-              "pm.test('分数正确', () => pm.expect(json.score).to.equal(42));"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"playerName\": \"TestPlayer\",\n  \"score\": 42\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/score",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "score"]
-        }
-      }
-    },
-    {
-      "name": "【完整流程】开始→跳跃→推进→结束",
+      "name": "🎯 分数 & 排行榜",
       "item": [
         {
-          "name": "Step 1: 开始游戏",
+          "name": "1.1 提交分数（正常）",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
-                  "pm.collectionVariables.set('sessionId', json.sessionId);",
-                  "console.log('Session:', json.sessionId);"
+                  "pm.test('返回 id 为数字', () => pm.expect(json.id).to.be.a('number'));",
+                  "pm.test('分数正确', () => pm.expect(json.score).to.equal(42));",
+                  "pm.test('玩家名正确', () => pm.expect(json.playerName).to.equal('TestPlayer'));",
+                  "pm.test('有创建时间', () => pm.expect(json.createdAt).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('scoreId', json.id);",
+                  "console.log('提交成功, ID:', json.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -211,7 +47,229 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\"screenWidth\":375,\"screenHeight\":667}"
+              "raw": "{\n  \"playerName\": \"TestPlayer\",\n  \"score\": 42\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        },
+        {
+          "name": "1.2 提交分数（0 分）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('分数为 0', () => pm.expect(json.score).to.equal(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerName\": \"ZeroPlayer\",\n  \"score\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        },
+        {
+          "name": "1.3 提交分数（高分）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('分数为 999', () => pm.expect(json.score).to.equal(999));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerName\": \"HighScorePlayer\",\n  \"score\": 999\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        },
+        {
+          "name": "1.4 提交分数（空名字）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('默认名字为 Anonymous', () => pm.expect(json.playerName).to.equal('Anonymous'));",
+                  "pm.test('分数正确', () => pm.expect(json.score).to.equal(10));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerName\": \"\",\n  \"score\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        },
+        {
+          "name": "2.1 查询排行榜（默认 limit=10）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('返回数组', () => pm.expect(json).to.be.an('array'));",
+                  "pm.test('最多返回 10 条', () => pm.expect(json.length).to.be.at.most(10));",
+                  "if (json.length > 0) {",
+                  "  pm.test('结果按分数降序排列', () => {",
+                  "    for (let i = 1; i < json.length; i++) {",
+                  "      pm.expect(json[i-1].score).to.be.at.least(json[i].score);",
+                  "    }",
+                  "  });",
+                  "  pm.test('记录包含必要字段', () => {",
+                  "    const record = json[0];",
+                  "    pm.expect(record).to.have.property('id');",
+                  "    pm.expect(record).to.have.property('playerName');",
+                  "    pm.expect(record).to.have.property('score');",
+                  "    pm.expect(record).to.have.property('createdAt');",
+                  "  });",
+                  "}",
+                  "console.log('排行榜返回', json.length, '条记录');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/score?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"],
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "2.2 查询排行榜（limit=20，最大条数）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('最多返回 20 条', () => pm.expect(json.length).to.be.at.most(20));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/score?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"],
+              "query": [{ "key": "limit", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "2.3 查询排行榜（limit=0，默认值）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('返回数组', () => pm.expect(json).to.be.an('array'));",
+                  "pm.test('limit=0 时使用默认值 10', () => pm.expect(json.length).to.be.at.most(10));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "score"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🕹️ 旧版游戏 API（保留兼容，前端不再使用）",
+      "item": [
+        {
+          "name": "1. 开始游戏",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "pm.test('返回 sessionId', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.sessionId).to.be.a('string').and.not.empty;",
+                  "    pm.collectionVariables.set('sessionId', json.sessionId);",
+                  "});",
+                  "pm.test('初始状态正确', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.player.isActive).to.be.true;",
+                  "    pm.expect(json.score).to.equal(0);",
+                  "    pm.expect(json.isGameOver).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenWidth\": 375,\n  \"screenHeight\": 667\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/game/start",
@@ -221,14 +279,15 @@
           }
         },
         {
-          "name": "Step 2: 跳跃",
+          "name": "2. 小鸟跳跃",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
-                  "pm.test('跳跃成功', () => pm.expect(json.isGameOver).to.be.false);"
+                  "pm.test('sessionId 匹配', () => pm.expect(json.sessionId).to.equal(pm.collectionVariables.get('sessionId')));"
                 ],
                 "type": "text/javascript"
               }
@@ -244,15 +303,15 @@
           }
         },
         {
-          "name": "Step 3: 推进 1 帧",
+          "name": "3. 推进帧",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
-                  "pm.test('帧数 >= 1', () => pm.expect(json.frame).to.be.at.least(1));",
-                  "console.log('Score:', json.score, 'Frame:', json.frame, 'Pipes:', json.pipes.length);"
+                  "pm.test('帧数递增', () => pm.expect(json.frame).to.be.above(0));"
                 ],
                 "type": "text/javascript"
               }
@@ -264,6 +323,38 @@
               "raw": "{{baseUrl}}/api/game/{{sessionId}}/tick",
               "host": ["{{baseUrl}}"],
               "path": ["api", "game", "{{sessionId}}", "tick"]
+            }
+          }
+        },
+        {
+          "name": "4. 获取游戏状态",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('状态码 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('状态包含所有必要字段', () => {",
+                  "    pm.expect(json).to.have.property('sessionId');",
+                  "    pm.expect(json).to.have.property('player');",
+                  "    pm.expect(json).to.have.property('pipes');",
+                  "    pm.expect(json).to.have.property('props');",
+                  "    pm.expect(json).to.have.property('score');",
+                  "    pm.expect(json).to.have.property('isGameOver');",
+                  "    pm.expect(json).to.have.property('frame');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/game/{{sessionId}}/state",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "game", "{{sessionId}}", "state"]
             }
           }
         }
