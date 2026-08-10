@@ -207,20 +207,20 @@ export default class GameInfo extends Emitter {
       endY: 44,
     };
 
-    /* 主页游戏指南按钮（右上角，正方形36×36） */
+    /* 主页游戏指南按钮（设置在下面，正方形36×36） */
     this.guideBtnArea = {
-      startX: SCREEN_WIDTH - 46,
-      startY: 8,
-      endX: SCREEN_WIDTH - 10,
-      endY: 44,
+      startX: 10,
+      startY: 52,
+      endX: 46,
+      endY: 88,
     };
 
     /* 游戏指南面板 */
     this._showGameGuide = false;
     this._guidePanelX = SCREEN_WIDTH / 2 - 160;
-    this._guidePanelY = SCREEN_HEIGHT / 2 - 175;
+    this._guidePanelY = SCREEN_HEIGHT / 2 - 195;
     this._guidePanelW = 320;
-    this._guidePanelH = 350;
+    this._guidePanelH = 390;
 
     /* 游戏指南关闭按钮 */
     this._guideCloseBtnArea = {
@@ -336,10 +336,10 @@ export default class GameInfo extends Emitter {
       ctx.fillText(`最高分: ${best}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 90);
     }
 
-    /* 设置按钮（右上角） */
+    /* 设置按钮（左上角） */
     this._renderSettingsBtn(ctx, this.homeSettingsBtnArea);
 
-    /* 游戏指南按钮（右上角） */
+    /* 游戏指南按钮（设置在下面） */
     this._renderGuideBtn(ctx);
 
     /* 游戏指南面板 */
@@ -1076,6 +1076,7 @@ export default class GameInfo extends Emitter {
     /* 内容区域 */
     const contentX = px + 20;
     let contentY = py + 65;
+    const maxWidth = this._guidePanelW - 56; /* 面板宽 - 左右边距 - 缩进 */
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -1083,12 +1084,15 @@ export default class GameInfo extends Emitter {
     const sections = [
       {
         title: '🎮 基本操作',
-        lines: ['点击屏幕让小鸟飞起，3条命+护盾可抵挡伤害，受伤后短暂无敌'],
+        lines: [
+          '点击屏幕让小鸟飞起',
+          '3条命 + 护盾可抵挡伤害，受伤后短暂无敌',
+        ],
       },
       {
         title: '✨ 道具效果',
         lines: [
-          '护盾 — 金色光环，抵挡一次碰撞',
+          '护盾 — 金色光环，抵挡一次碰撞，持续5秒',
           '双倍分数 — x2 持续 6 秒',
         ],
       },
@@ -1096,8 +1100,8 @@ export default class GameInfo extends Emitter {
         title: '⚠️ 障碍物',
         lines: [
           '水管 — 主要障碍物，始终存在',
-          '圆锯 — 5 分后出现，吸附于水管间隙旋转',
-          '火箭 — 10 分后出现，追踪玩家后直线飞射',
+          '圆锯 — 5分后吸附于水管间隙旋转',
+          '火箭 — 10分后追踪玩家直线飞射',
         ],
       },
       {
@@ -1113,12 +1117,15 @@ export default class GameInfo extends Emitter {
       ctx.fillText(section.title, contentX, contentY);
       contentY += 22;
 
-      /* 小节内容 */
+      /* 小节内容（自动换行） */
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.font = '13px Arial';
       section.lines.forEach((line) => {
-        ctx.fillText(line, contentX + 8, contentY);
-        contentY += 20;
+        const wrappedLines = this._wrapText(ctx, line, maxWidth);
+        wrappedLines.forEach((wl) => {
+          ctx.fillText(wl, contentX + 8, contentY);
+          contentY += 20;
+        });
       });
 
       contentY += 8; /* 小节间距 */
@@ -1538,6 +1545,23 @@ export default class GameInfo extends Emitter {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('返回', (backBtn.startX + backBtn.endX) / 2, (backBtn.startY + backBtn.endY) / 2);
+  }
+
+  /* 文本自动换行：将长文本按最大宽度拆分为多行 */
+  _wrapText(ctx, text, maxWidth) {
+    const lines = [];
+    let current = '';
+    for (let i = 0; i < text.length; i++) {
+      const test = current + text[i];
+      if (ctx.measureText(test).width > maxWidth && current.length > 0) {
+        lines.push(current);
+        current = text[i];
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
   }
 
   /* 检测点是否在按钮区域内 */
