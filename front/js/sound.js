@@ -137,9 +137,9 @@ export default class Sound {
     a.play();
   }
 
-  /** 动态调整引信音量（追踪阶段从 0.2 渐增至 1.0） */
+  /** 动态调整引信音量（追踪阶段从 0.2 渐增至 0.8） */
   setFuseBurnVolume(vol) {
-    this._fuseBurnDynamicVol = Math.max(0.05, Math.min(1, vol));
+    this._fuseBurnDynamicVol = Math.max(0.05, Math.min(0.8, vol));
     const a = this._cache.fuseBurn;
     if (a) {
       const cfg = AUDIO_CONFIG.fuseBurn;

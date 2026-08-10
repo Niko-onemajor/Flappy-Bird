@@ -2,17 +2,17 @@
 
 /* ========== 音效音量 ========== */
 export const AUDIO_VOLUME = {
-  bgm: 0.12,
-  wing: 0.25,
-  point: 0.3,
-  hit: 0.35,
-  die: 0.3,
-  swoosh: 0.25,
-  shieldBreak: 0.4,
-  shieldPickup: 0.35,
-  scoreX2: 0.35,
-  fuseBurn: 0.3,
-  rocketFly: 0.2,
+  bgm: 0.15,          /* 背景音乐为主旋律，音量适中 */
+  wing: 0.15,         /* 翅膀拍打：短促点击音，不宜过大 */
+  point: 0.18,        /* 得分反馈：清晰但不刺耳 */
+  hit: 0.2,           /* 碰撞音效：有反馈感但不震耳 */
+  die: 0.2,           /* 死亡音效：与 hit 保持一致 */
+  swoosh: 0.15,       /* 划过音效：轻柔点缀 */
+  shieldBreak: 0.22,  /* 护盾破碎：反馈清晰但不过度 */
+  shieldPickup: 0.2,  /* 护盾拾取：与 shieldBreak 平衡 */
+  scoreX2: 0.2,       /* 双倍分数：提示音不宜过大 */
+  fuseBurn: 0.15,     /* 火箭引信：持续音效，音量偏低避免干扰 BGM */
+  rocketFly: 0.12,    /* 火箭飞行：持续音效，最低音量 */
 };
 
 /* ========== 地面配置 ========== */
