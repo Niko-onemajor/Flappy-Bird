@@ -51,14 +51,11 @@ export default class GameInfo extends Emitter {
       endY: SCREEN_HEIGHT - 14,
     };
 
-    /* 加载本地缓存的玩家昵称 */
+    /* 不自动加载本地缓存的昵称到 GameGlobal.nickName，
+     * 新玩家首次进入时需输入昵称。缓存仅作为输入对话框默认值。 */
     this._cachedNickName = null;
     try {
-      const saved = wx.getStorageSync(NICKNAME_KEY);
-      if (saved) {
-        this._cachedNickName = saved;
-        GameGlobal.nickName = saved;
-      }
+      this._cachedNickName = wx.getStorageSync(NICKNAME_KEY) || null;
     } catch (e) {}
 
     /* 键盘输入状态 */
@@ -1140,22 +1137,23 @@ export default class GameInfo extends Emitter {
     this._roundRect(ctx, area.startX, area.startY, area.endX - area.startX, area.endY - area.startY, 6);
     ctx.fill();
 
-    /* 玩家图标 + 昵称 */
+    /* 玩家图标 + 昵称（优先使用当前设置的昵称，否则尝试缓存值） */
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    const name = GameGlobal.nickName || '未设置';
-    const label = name.length > 8 ? name.slice(0, 7) + '…' : name;
-    ctx.fillText(`👤 ${label}`, area.startX + 8, (area.startY + area.endY) / 2);
+    const displayName = GameGlobal.nickName || this._cachedNickName || '';
+    const name = displayName.length > 8 ? displayName.slice(0, 7) + '…' : (displayName || '未设置');
+    ctx.fillText(`👤 ${name}`, area.startX + 8, (area.startY + area.endY) / 2);
   }
 
   /* ========== 自定义昵称对话框 ========== */
 
-  /** 弹出自定义昵称对话框（自动弹出系统键盘） */
+  /** 弹出自定义昵称对话框（自动弹出系统键盘）
+   *  使用缓存昵称作为默认输入值，方便回访玩家直接确认 */
   _showNicknameInput() {
     this._showNameDialog = true;
-    this._nameDialogText = GameGlobal.nickName || '';
+    this._nameDialogText = GameGlobal.nickName || this._cachedNickName || '';
     this._nameDialogBtnPress = 0;
     this._nameDialogSuccess = false;
     this._nameDialogSuccessTimer = 0;

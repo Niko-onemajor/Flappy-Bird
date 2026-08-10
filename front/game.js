@@ -39,14 +39,8 @@ GameGlobal.fetchWxNickName = fetchWxNickName;
 /* 调试模式默认关闭，开发者可在微信开发工具中手动开启调试 */
 /* 此处不调用 wx.setEnableDebug(false)，以保留手动开启调试的能力 */
 
-/* 加载本地缓存的玩家昵称 */
-try {
-  const saved = wx.getStorageSync('flappy_nickname');
-  if (saved) {
-    GameGlobal.nickName = saved;
-    console.log('[Game] 加载本地昵称:', saved);
-  }
-} catch (e) {}
+/* 不自动加载本地缓存的昵称到 GameGlobal.nickName，确保新玩家首次进入时
+ * 需要输入昵称。缓存昵称仅在昵称输入对话框中作为默认值提供，方便回访玩家。 */
 
 /* 开启高性能模式：iOS 设备获得更好的渲染性能 */
 if (typeof wx.setPreferredFramesPerSecond === 'function') {
